@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>pH Detection Dashboard</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js"></script>
+    
+    <!-- Chart.js untuk visualisasi -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- HEADER -->
+    <div class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1>🔬 pH Detection Dashboard</h1>
+                <div class="status-bar">
+                    <div id="deviceStatus" class="status-indicator offline">● Connecting...</div>
+                    <div id="lastUpdateTime" class="last-update">Last update: --</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="container">
+        
+        <!-- CURRENT READING CARD -->
+        <div class="main-content">
+            <div class="card current-reading">
+                <h2>📊 Current Reading (Pembacaan Terakhir)</h2>
+                
+                <div class="reading-grid">
+                    <div class="reading-item">
+                        <label>pH Value</label>
+                        <div id="currentPH" class="reading-value">--</div>
+                    </div>
+                    
+                    <div class="reading-item">
+                        <label>Status</label>
+                        <div id="currentStatus" class="reading-status unknown">--</div>
+                    </div>
+                    
+                    <div class="reading-item">
+                        <label>Meaning</label>
+                        <div id="currentMeaning" class="reading-meaning">--</div>
+                    </div>
+                </div>
+
+                <div class="reading-details">
+                    <p><strong>🎨 Normalized RGB:</strong> <span id="currentRGB">(--,--,--)</span></p>
+                    <p><strong>📡 Raw RGB (Frequency):</strong> <span id="currentRawRGB">(--,--,--)</span></p>
+                    <p><strong>⏰ Timestamp:</strong> <span id="currentTimestamp">--</span></p>
+                </div>
+            </div>
+
+            <!-- CHART SECTION -->
+            <div class="card chart-section">
+                <h2>📈 pH Trend (50 Scan Terakhir)</h2>
+                <div class="chart-container">
+                    <canvas id="phChart"></canvas>
+                </div>
+                <div class="chart-info">
+                    Grafik menunjukkan trend pH dari 50 scan terakhir.
+                    <br>🟢 Hijau = FRESH | 🟠 Orange = CAUTION | 🔴 Merah = ROTTEN
+                </div>
+            </div>
+
+            <!-- STATISTICS SECTION -->
+            <div class="card stats-section">
+                <h2>📌 Statistics (Statistik)</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <label>Total Scans</label>
+                        <div class="stat-value" id="totalScans">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <label>Average pH</label>
+                        <div class="stat-value" id="avgPH">--</div>
+                    </div>
+                    <div class="stat-item">
+                        <label>Fresh 🟢</label>
+                        <div class="stat-value" id="freshCount">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <label>Caution 🟠</label>
+                        <div class="stat-value" id="cautionCount">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <label>Rotten 🔴</label>
+                        <div class="stat-value" id="rottenCount">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HISTORY SECTION -->
+            <div class="card history-section">
+                <div class="section-header">
+                    <h2>📋 Scan History (50 Data Terakhir)</h2>
+                    <div class="section-controls">
+                        <button id="refreshBtn" class="btn btn-primary">🔄 Refresh</button>
+                        <button id="realtimeToggle" class="btn btn-info active">⏱️ Real-time: ON</button>
+                        <button id="exportBtn" class="btn btn-success">📥 Export CSV</button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Waktu (Timestamp)</th>
+                                <th>pH</th>
+                                <th>Status</th>
+                                <th>Meaning</th>
+                                <th>RGB (R,G,B)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr>
+                                <td colspan="5" class="loading">Loading data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+        <p>pH Detection System | ESP32 + Firebase + Web Dashboard</p>
+        <p>Last Update: <span id="footerTime">--</span></p>
+    </div>
+
+    <!-- NOTIFICATION MODAL -->
+    <div id="notificationModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modalTitle">Notification</h2>
+            <p id="modalMessage">This is a notification message.</p>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="script.js"></script>
+</body>
+</html>
