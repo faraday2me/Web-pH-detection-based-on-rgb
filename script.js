@@ -19,33 +19,7 @@ let phChart = null;
 let isRealtimeEnabled = false;
 let realtimeListener = null;
 
-// ===== FIREBASE INITIALIZATION (UPDATED) =====
-function initializeFirebase() {
-    try {
-        console.log("[Firebase] Starting initialization...");
-
-        // Initialize Firebase hanya sekali
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-            console.log("[Firebase] App initialized successfully");
-        }
-
-        db = firebase.database();
-        console.log("[Firebase] Database instance created");
-
-        // Update status
-        updateConnectionStatus(true);
-
-        // Test koneksi
-        testFirebaseConnection();
-
-    } catch (error) {
-        console.error("[Firebase] Initialization Error:", error);
-        updateConnectionStatus(false);
-    }
-}
-
-// Helper untuk update status
+// ===== HELPER FUNCTIONS =====
 function updateConnectionStatus(isOnline) {
     const statusEl = document.getElementById('deviceStatus');
     if (statusEl) {
@@ -59,46 +33,75 @@ function updateConnectionStatus(isOnline) {
     }
 }
 
-// Test Connection
-function testFirebaseConnection() {
+// Fetch data dari Firebase
+function fetchAllScans() {
     if (!db) return;
-
-    db.ref('.info/connected').on('value', (snapshot) => {
-        const isConnected = snapshot.val() === true;
-        console.log("[Firebase] Realtime connection:", isConnected ? "CONNECTED" : "DISCONNECTED");
-        updateConnectionStatus(isConnected);
-        
-        if (isConnected) {
-            fetchAllScans();   // ambil data
-        }
+    
+    console.log("[Firebase] Fetching all scans...");
+    
+    db.ref('scans').once('value', (snapshot) => {
+        allScans = [];
+        snapshot.forEach((child) => {
+            allScans.push(child.val());
+        });
+        console.log(`[Firebase] Loaded ${allScans.length} scans`);
+        renderTable();
+        renderChart();
     });
 }
 
-// ===== TEST FIREBASE CONNECTION =====
-function testFirebaseConnection() {
+// Render tabel (sesuaikan dengan struktur HTML kamu)
+function renderTable() {
+    const tbody = document.getElementById('tableBody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    if (allScans.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Belum ada data sensor</td></tr>';
+        return;
+    }
+    
+    allScans.slice(-10).reverse().forEach(scan => {   // tampilkan 10 data terakhir
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${scan.timestamp || '-'}</td>
+            <td>${scan.ph || '-'}</td>
+            <td>${scan.rgb || '-'}</td>
+            <td>${scan.temperature || '-'}</td>
+            <td>${scan.status || 'Normal'}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Render Chart (kosongkan dulu biar tidak error)
+function renderChart() {
+    console.log("[Chart] Render chart called");
+    // Tambahkan kode chart kalau sudah ada
+}
+
+// ===== INISIALISASI =====
+function initializeFirebase() {
     try {
-        console.log("[Firebase] Testing connection...");
-        
-        db.ref('.info/connected').on('value', (snapshot) => {
-            if (snapshot.val() === true) {
-                console.log("[Firebase] ✓ Connected to realtime database");
-                document.getElementById('deviceStatus').className = 'status-indicator online';
-                document.getElementById('deviceStatus').textContent = '● Online';
-                
-                // Fetch data setelah connected
-                fetchAllScans();
-            } else {
-                console.log("[Firebase] ✗ Disconnected from database");
-                document.getElementById('deviceStatus').className = 'status-indicator offline';
-                document.getElementById('deviceStatus').textContent = '● Offline';
-            }
-        });
+        console.log("[Firebase] Starting initialization...");
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+            console.log("[Firebase] App initialized");
+        }
+
+        db = firebase.database();
+        console.log("[Firebase] Database ready");
+
+        updateConnectionStatus(true);
+        fetchAllScans();           // ambil data
+
     } catch (error) {
-        console.error("[Firebase] Connection test error:", error);
+        console.error("[Firebase] Error:", error);
+        updateConnectionStatus(false);
     }
 }
 
-// Jalankan saat halaman selesai load
-window.addEventListener('load', () => {
-    initializeFirebase();
-});
+// Jalankan saat halaman load
+window.addEventListener('load', initializeFirebase);
