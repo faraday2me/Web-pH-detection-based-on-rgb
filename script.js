@@ -170,4 +170,52 @@ function initializeFirebase() {
 // ==================== INIT ====================
 window.addEventListener('load', () => {
     initializeFirebase();
+
+  // ==================== BUTTON EVENT LISTENERS ====================
+document.getElementById('refreshBtn').addEventListener('click', () => {
+    if (db) {
+        fetchAllScans();
+    }
+});
+
+document.getElementById('realtimeToggle').addEventListener('click', function() {
+    // Untuk sementara kita matikan realtime dulu
+    this.textContent = '⏱️ Real-time: OFF';
+    this.classList.remove('active');
+    alert('Real-time mode dimatikan untuk sementara');
+});
+
+// Export CSV
+document.getElementById('exportBtn').addEventListener('click', () => {
+    if (allScans.length === 0) {
+        alert("Belum ada data untuk diekspor");
+        return;
+    }
+    
+    let csv = "Timestamp,pH,Status,Meaning,RGB\n";
+    allScans.forEach(scan => {
+        csv += `"${scan.timestamp}","${scan.ph || ''}","${scan.status || ''}","${scan.meaning || ''}","${scan.rgb || ''}"\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ph-scans.csv';
+    a.click();
+});
+
+// Delete All (konfirmasi)
+document.getElementById('deleteAllBtn').addEventListener('click', () => {
+    if (confirm("Yakin mau hapus SEMUA data?")) {
+        if (db) {
+            db.ref('scans').remove()
+                .then(() => {
+                    allScans = [];
+                    renderTable();
+                    alert("Semua data berhasil dihapus");
+                });
+        }
+    }
+});
 });
