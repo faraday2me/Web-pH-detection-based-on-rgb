@@ -14,6 +14,8 @@
     --color-primary: #2196F3;
     --color-secondary: #17a2b8;
     --color-success: #4CAF50;
+    --color-warning: #FF9800;
+    --color-danger: #F44336;
     --color-bg: #f5f5f5;
     --color-card: #ffffff;
     --color-border: #ddd;
@@ -297,6 +299,21 @@ body {
     font-style: italic;
 }
 
+.btn-delete-item {
+    padding: 5px 10px;
+    background-color: var(--color-danger);
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: var(--transition);
+}
+
+.btn-delete-item:hover {
+    background-color: #d32f2f;
+}
+
 /* ===== STATS SECTION ===== */
 .stats-section {
     grid-column: 1 / -1;
@@ -374,6 +391,33 @@ body {
     background-color: #138496;
 }
 
+.btn-warning {
+    background-color: var(--color-warning);
+    color: white;
+}
+
+.btn-warning:hover {
+    background-color: #e68900;
+}
+
+.btn-danger {
+    background-color: var(--color-danger);
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #d32f2f;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
+
 .btn.active {
     background-color: var(--color-fresh);
 }
@@ -417,6 +461,13 @@ body {
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
 
+.modal-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    justify-content: flex-end;
+}
+
 .close {
     color: var(--color-text-light);
     float: right;
@@ -430,7 +481,8 @@ body {
     color: var(--color-text);
 }
 
-#modalTitle {
+#modalTitle,
+#confirmTitle {
     margin-bottom: 15px;
     color: var(--color-primary);
 }
@@ -458,7 +510,8 @@ body {
     .btn {
         flex: 1;
         justify-content: center;
-        min-width: 120px;
+        min-width: 100px;
+        font-size: 0.85em;
     }
 
     .reading-grid {
@@ -509,7 +562,15 @@ body {
     }
 
     .btn {
-        padding: 8px 15px;
-        font-size: 0.85em;
+        padding: 8px 12px;
+        font-size: 0.8em;
+    }
+
+    .section-controls {
+        flex-direction: column;
+    }
+
+    .btn {
+        width: 100%;
     }
 }
