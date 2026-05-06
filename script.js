@@ -150,18 +150,32 @@ function updateCurrentReading(scan) {
     document.getElementById('lastUpdateTime').textContent = `Last update: ${formatTime(timestamp)}`;
 }
 
-// ===== FETCH ALL SCANS =====
+// ===== FETCH ALL SCANS (FIXED) =====
 async function fetchAllScans() {
     try {
+        // Check apakah db sudah initialized
+        if (!db) {
+            console.error("Database not initialized");
+            showNotification("Error", "Database not initialized. Refresh page.");
+            return;
+        }
+
+        console.log("[Firebase] Fetching scans...");
+        
         const snapshot = await db.ref('scans').orderByChild('timestamp').limitToLast(50).once('value');
         
         if (!snapshot.exists()) {
-            console.log("No scans found");
+            console.log("[Firebase] No scans found");
             allScans = [];
+            updateCurrentReading(null);
+            updateHistoryTable([]);
+            updateStatistics([]);
             return;
         }
 
         const data = snapshot.val();
+        console.log("[Firebase] Data received:", data);
+        
         allScans = [];
         
         // Convert object to array dan reverse (newest first)
@@ -172,16 +186,18 @@ async function fetchAllScans() {
             });
         });
 
-        console.log(`✓ Loaded ${allScans.length} scans`);
+        console.log(`[Firebase] ✓ Loaded ${allScans.length} scans`);
         
         // Update UI
-        updateCurrentReading(allScans[0]);
+        if (allScans.length > 0) {
+            updateCurrentReading(allScans[0]);
+        }
         updateHistoryTable(allScans);
         updateStatistics(allScans);
         updateChart(allScans);
         
     } catch (error) {
-        console.error("✗ Error fetching scans:", error);
+        console.error("[Firebase] Error fetching scans:", error);
         showNotification("Error", "Failed to fetch scans: " + error.message);
     }
 }
