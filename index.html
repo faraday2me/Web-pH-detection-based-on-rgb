@@ -108,6 +108,8 @@
                         <button id="refreshBtn" class="btn btn-primary">🔄 Refresh</button>
                         <button id="realtimeToggle" class="btn btn-info active">⏱️ Real-time: ON</button>
                         <button id="exportBtn" class="btn btn-success">📥 Export CSV</button>
+                        <button id="deleteOldBtn" class="btn btn-warning">🗑️ Delete Old</button>
+                        <button id="deleteAllBtn" class="btn btn-danger">🗑️ Delete All</button>
                     </div>
                 </div>
 
@@ -120,11 +122,12 @@
                                 <th>Status</th>
                                 <th>Meaning</th>
                                 <th>RGB (R,G,B)</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody id="tableBody">
                             <tr>
-                                <td colspan="5" class="loading">Loading data...</td>
+                                <td colspan="6" class="loading">Loading data...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -146,6 +149,19 @@
             <span class="close">&times;</span>
             <h2 id="modalTitle">Notification</h2>
             <p id="modalMessage">This is a notification message.</p>
+        </div>
+    </div>
+
+    <!-- CONFIRMATION MODAL -->
+    <div id="confirmationModal" class="modal">
+        <div class="modal-content">
+            <span id="confirmClose" class="close">&times;</span>
+            <h2 id="confirmTitle">Confirm Action</h2>
+            <p id="confirmMessage">Are you sure?</p>
+            <div class="modal-buttons">
+                <button id="confirmYes" class="btn btn-danger">Yes, Delete</button>
+                <button id="confirmNo" class="btn btn-secondary">Cancel</button>
+            </div>
         </div>
     </div>
 
