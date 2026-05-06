@@ -76,50 +76,75 @@ function renderTable() {
     });
 }
 
-// ===== UPDATE CURRENT READING =====
+// ===== UPDATE CURRENT READING & STATUS =====
 function updateCurrentReading(scan) {
     if (!scan) return;
 
     document.getElementById('currentPH').textContent = scan.ph ? scan.ph.toFixed(2) : '--';
-    document.getElementById('currentRGB').textContent = scan.rgb || '(--,--,--)';
-    document.getElementById('currentTimestamp').textContent = scan.timestamp ? new Date(scan.timestamp).toLocaleString('id-ID') : '--';
-    
+    document.getElementById('currentRGB').textContent = scan.rgb || '(--, --, --)';
+    document.getElementById('currentRawRGB').textContent = scan.rawRGB || '(--, --, --)';
+    document.getElementById('currentTimestamp').textContent = scan.timestamp ? 
+        new Date(scan.timestamp).toLocaleString('id-ID') : '--';
+
     const statusEl = document.getElementById('currentStatus');
-    statusEl.textContent = scan.status || 'Normal';
-    
-    if (scan.status === 'Fresh') statusEl.className = 'reading-status fresh';
-    else if (scan.status === 'Caution') statusEl.className = 'reading-status caution';
-    else if (scan.status === 'Rotten') statusEl.className = 'reading-status rotten';
+    statusEl.textContent = scan.status || '--';
+
+    if (scan.status === "Fresh") statusEl.className = "reading-status fresh";
+    else if (scan.status === "Caution") statusEl.className = "reading-status caution";
+    else if (scan.status === "Rotten") statusEl.className = "reading-status rotten";
 }
 
-// ===== RENDER CHART (Simple) =====
-function renderChart() {
-    const ctx = document.getElementById('phChart');
-    if (!ctx || allScans.length === 0) return;
+// ===== RENDER TABLE =====
+function renderTable() {
+    const tbody = document.getElementById('tableBody');
+    if (!tbody) return;
 
-    if (phChart) phChart.destroy();
+    tbody.innerHTML = '';
 
-    const recent = allScans.slice(-50);
-    const labels = recent.map(s => new Date(s.timestamp).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'}));
-    const phValues = recent.map(s => s.ph);
+    if (allScans.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;color:#888;">Belum ada data dari sensor</td></tr>`;
+        return;
+    }
 
-    phChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'pH Value',
-                data: phValues,
-                borderColor: '#4CAF50',
-                tension: 0.3,
-                fill: false
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false
-        }
+    allScans.slice(-50).reverse().forEach((scan, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${scan.timestamp ? new Date(scan.timestamp).toLocaleString('id-ID') : '-'}</td>
+            <td><strong>${scan.ph ? scan.ph.toFixed(2) : '-'}</strong></td>
+            <td>${scan.status || '-'}</td>
+            <td>${scan.meaning || '-'}</td>
+            <td>${scan.rgb || '-'}</td>
+            <td></td>
+        `;
+        tbody.appendChild(row);
     });
+}
+
+// ===== MAIN INITIALIZE =====
+function initializeFirebase() {
+    try {
+        console.log("[Firebase] Starting initialization...");
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+            console.log("[Firebase] App initialized successfully");
+        }
+
+        db = firebase.database();
+        console.log("[Firebase] Database ready");
+
+        // Update status ke Online
+        document.getElementById('deviceStatus').className = 'status-indicator online';
+        document.getElementById('deviceStatus').innerHTML = '● Online';
+
+        // Ambil data
+        fetchAllScans();
+
+    } catch (error) {
+        console.error("[Firebase] Critical Error:", error);
+        document.getElementById('deviceStatus').className = 'status-indicator offline';
+        document.getElementById('deviceStatus').innerHTML = '● Firebase Error';
+    }
 }
 
 // ===== INISIALISASI =====
