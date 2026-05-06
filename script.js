@@ -169,5 +169,57 @@ function initializeFirebase() {
     }
 }
 
+// ===== RENDER CHART =====
+function renderChart() {
+    const canvas = document.getElementById('phChart');
+    if (!canvas) {
+        console.warn("[Chart] Canvas phChart tidak ditemukan");
+        return;
+    }
+
+    if (phChart) {
+        phChart.destroy();
+    }
+
+    if (allScans.length === 0) return;
+
+    const recent = allScans.slice(-50);
+    const labels = recent.map(scan => {
+        return scan.timestamp ? new Date(scan.timestamp).toLocaleTimeString('id-ID') : '';
+    });
+    const phValues = recent.map(scan => scan.ph || 0);
+
+    phChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'pH Level',
+                data: phValues,
+                borderColor: '#4CAF50',
+                backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                tension: 0.4,
+                borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true }
+            },
+            scales: {
+                y: {
+                    min: 0,
+                    max: 14,
+                    ticks: { stepSize: 1 }
+                }
+            }
+        }
+    });
+
+    console.log(`[Chart] Berhasil render ${phValues.length} data`);
+}
+
 // Jalankan saat halaman load
 window.addEventListener('load', initializeFirebase);
