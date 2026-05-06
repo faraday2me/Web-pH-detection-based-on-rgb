@@ -33,20 +33,35 @@ function updateConnectionStatus(isOnline) {
     }
 }
 
-// Fetch data dari Firebase
 function fetchAllScans() {
-    if (!db) return;
+    if (!db) {
+        console.error("[Firebase] Database belum siap");
+        return;
+    }
     
     console.log("[Firebase] Fetching all scans...");
     
     db.ref('scans').once('value', (snapshot) => {
         allScans = [];
+        
         snapshot.forEach((child) => {
-            allScans.push(child.val());
+            const data = child.val();
+            allScans.push(data);
         });
+
         console.log(`[Firebase] Loaded ${allScans.length} scans`);
+        
+        // Update semua tampilan
+        if (allScans.length > 0) {
+            const latest = allScans[allScans.length - 1];  // data terbaru
+            updateCurrentReading(latest);
+        }
+        
         renderTable();
         renderChart();
+        
+    }, (error) => {
+        console.error("[Firebase] Error fetching data:", error);
     });
 }
 
