@@ -5,11 +5,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyAHuCnBj49G60HptaJyHtinT_OSeDvfgmY",
   authDomain: "ph-detection-based-on-rgb.firebaseapp.com",
   databaseURL: "https://ph-detection-based-on-rgb-default-rtdb.firebaseio.com",
-  projectId: "ph-detection-based-on-rgb",
-  storageBucket: "ph-detection-based-on-rgb.firebasestorage.app",
-  messagingSenderId: "48403449960",
-  appId: "1:48403449960:web:d86dee6a856457436613dd",
-  measurementId: "G-T39CN1MLQF"
+  projectId: "ph-detection-based-on-rgb"
 };
 
 // ===== GLOBAL VARIABLES =====
