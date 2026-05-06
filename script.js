@@ -50,35 +50,76 @@ function fetchAllScans() {
     });
 }
 
-// Render tabel (sesuaikan dengan struktur HTML kamu)
+// ===== RENDER TABLE (Sesuai HTML kamu) =====
 function renderTable() {
     const tbody = document.getElementById('tableBody');
     if (!tbody) return;
-    
+
     tbody.innerHTML = '';
-    
+
     if (allScans.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Belum ada data sensor</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:30px;">Belum ada data scan</td></tr>`;
         return;
     }
-    
-    allScans.slice(-10).reverse().forEach(scan => {   // tampilkan 10 data terakhir
+
+    allScans.slice(-50).reverse().forEach(scan => {
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td>${scan.timestamp || '-'}</td>
-            <td>${scan.ph || '-'}</td>
-            <td>${scan.rgb || '-'}</td>
-            <td>${scan.temperature || '-'}</td>
+            <td>${scan.timestamp ? new Date(scan.timestamp).toLocaleString('id-ID') : '-'}</td>
+            <td>${scan.ph ? scan.ph.toFixed(2) : '-'}</td>
             <td>${scan.status || 'Normal'}</td>
+            <td>${scan.meaning || '-'}</td>
+            <td>${scan.rgb ? scan.rgb : '-'}</td>
+            <td><button class="btn btn-small" onclick="deleteScan('${scan.id || ''}')">Hapus</button></td>
         `;
         tbody.appendChild(row);
     });
 }
 
-// Render Chart (kosongkan dulu biar tidak error)
+// ===== UPDATE CURRENT READING =====
+function updateCurrentReading(scan) {
+    if (!scan) return;
+
+    document.getElementById('currentPH').textContent = scan.ph ? scan.ph.toFixed(2) : '--';
+    document.getElementById('currentRGB').textContent = scan.rgb || '(--,--,--)';
+    document.getElementById('currentTimestamp').textContent = scan.timestamp ? new Date(scan.timestamp).toLocaleString('id-ID') : '--';
+    
+    const statusEl = document.getElementById('currentStatus');
+    statusEl.textContent = scan.status || 'Normal';
+    
+    if (scan.status === 'Fresh') statusEl.className = 'reading-status fresh';
+    else if (scan.status === 'Caution') statusEl.className = 'reading-status caution';
+    else if (scan.status === 'Rotten') statusEl.className = 'reading-status rotten';
+}
+
+// ===== RENDER CHART (Simple) =====
 function renderChart() {
-    console.log("[Chart] Render chart called");
-    // Tambahkan kode chart kalau sudah ada
+    const ctx = document.getElementById('phChart');
+    if (!ctx || allScans.length === 0) return;
+
+    if (phChart) phChart.destroy();
+
+    const recent = allScans.slice(-50);
+    const labels = recent.map(s => new Date(s.timestamp).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'}));
+    const phValues = recent.map(s => s.ph);
+
+    phChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'pH Value',
+                data: phValues,
+                borderColor: '#4CAF50',
+                tension: 0.3,
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
 }
 
 // ===== INISIALISASI =====
