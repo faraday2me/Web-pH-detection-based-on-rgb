@@ -1,6 +1,6 @@
 // pH Detection Dashboard - Main Logic
 
-// ===== FIREBASE CONFIG - GANTI INI! =====
+// ===== FIREBASE CONFIG =====
 const firebaseConfig = {
     apiKey: "AIzaSyAHuCnBj49G60HptaJyHtinT_OSeDvfgmY",
     authDomain: "ph-detection-based-on-rgb.firebaseapp.com",
@@ -83,6 +83,38 @@ document.querySelector('.close').onclick = function() {
     document.getElementById('notificationModal').style.display = 'none';
 }
 
+// ===== CONFIRMATION MODAL =====
+function showConfirmation(title, message, onConfirm, onCancel) {
+    const modal = document.getElementById('confirmationModal');
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMessage').textContent = message;
+    
+    const confirmBtn = document.getElementById('confirmYes');
+    const cancelBtn = document.getElementById('confirmNo');
+    
+    // Remove old event listeners
+    confirmBtn.onclick = null;
+    cancelBtn.onclick = null;
+    
+    modal.style.display = 'block';
+    
+    confirmBtn.onclick = function() {
+        modal.style.display = 'none';
+        if (onConfirm) onConfirm();
+    };
+    
+    cancelBtn.onclick = function() {
+        modal.style.display = 'none';
+        if (onCancel) onCancel();
+    };
+    
+    // Close saat click X
+    document.getElementById('confirmClose').onclick = function() {
+        modal.style.display = 'none';
+        if (onCancel) onCancel();
+    };
+}
+
 // ===== UPDATE CURRENT READING UI =====
 function updateCurrentReading(scan) {
     if (!scan) return;
@@ -159,11 +191,11 @@ function updateHistoryTable(scans) {
     tbody.innerHTML = '';
 
     if (scans.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="loading">No data available</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">No data available</td></tr>';
         return;
     }
 
-    scans.forEach(scan => {
+    scans.forEach((scan, index) => {
         const row = document.createElement('tr');
         
         const time = formatTime(scan.timestamp);
@@ -179,9 +211,21 @@ function updateHistoryTable(scans) {
             <td class="${getStatusClass(status)}">${status}</td>
             <td>${meaning}</td>
             <td><code>${rgbText}</code></td>
+            <td>
+                <button class="btn-delete-item" data-scan-id="${scan.id}" data-index="${index}">🗑️ Delete</button>
+            </td>
         `;
         
         tbody.appendChild(row);
+    });
+
+    // Add event listeners untuk delete button
+    document.querySelectorAll('.btn-delete-item').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const scanId = e.target.getAttribute('data-scan-id');
+            const index = e.target.getAttribute('data-index');
+            deleteSpecificScan(scanId, index);
+        });
     });
 }
 
@@ -316,6 +360,96 @@ function exportToCSV() {
     showNotification("Success", "CSV exported successfully!");
 }
 
+// ===== DELETE SPECIFIC SCAN =====
+async function deleteSpecificScan(scanId, index) {
+    showConfirmation(
+        "Delete Scan?",
+        `Delete scan at index ${parseInt(index) + 1}?\n\nThis action cannot be undone.`,
+        async () => {
+            try {
+                await db.ref(`scans/${scanId}`).remove();
+                showNotification("Success", "Scan deleted successfully!");
+                fetchAllScans();
+            } catch (error) {
+                console.error("Error deleting scan:", error);
+                showNotification("Error", "Failed to delete scan: " + error.message);
+            }
+        }
+    );
+}
+
+// ===== DELETE ALL SCANS =====
+function deleteAllScans() {
+    showConfirmation(
+        "⚠️ Delete All Scans?",
+        `This will delete ALL ${allScans.length} scans from the database.\n\nThis action CANNOT be undone!`,
+        async () => {
+            try {
+                document.getElementById('deleteAllBtn').disabled = true;
+                showNotification("Deleting", "Deleting all scans...");
+                
+                await db.ref('scans').remove();
+                
+                allScans = [];
+                updateCurrentReading(null);
+                updateHistoryTable([]);
+                updateStatistics([]);
+                updateChart([]);
+                
+                showNotification("Success", "All scans deleted successfully!");
+                document.getElementById('deleteAllBtn').disabled = false;
+            } catch (error) {
+                console.error("Error deleting all scans:", error);
+                showNotification("Error", "Failed to delete scans: " + error.message);
+                document.getElementById('deleteAllBtn').disabled = false;
+            }
+        }
+    );
+}
+
+// ===== DELETE SCANS OLDER THAN X DAYS =====
+function deleteOldScans() {
+    const days = prompt("Delete scans older than how many days?\n\nEnter number of days (e.g., 7 untuk 7 hari lalu):");
+    
+    if (days === null) return; // User cancel
+    
+    const daysNum = parseInt(days);
+    if (isNaN(daysNum) || daysNum < 0) {
+        showNotification("Error", "Invalid input. Please enter a positive number.");
+        return;
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const oldestTimestamp = now - (daysNum * 24 * 60 * 60);
+    
+    const scansToDelete = allScans.filter(scan => scan.timestamp < oldestTimestamp);
+    
+    if (scansToDelete.length === 0) {
+        showNotification("Info", `No scans older than ${daysNum} days found.`);
+        return;
+    }
+
+    showConfirmation(
+        "Delete Old Scans?",
+        `Found ${scansToDelete.length} scans older than ${daysNum} days.\n\nDelete them?`,
+        async () => {
+            try {
+                showNotification("Deleting", `Deleting ${scansToDelete.length} old scans...`);
+                
+                for (let scan of scansToDelete) {
+                    await db.ref(`scans/${scan.id}`).remove();
+                }
+                
+                showNotification("Success", `Deleted ${scansToDelete.length} old scans!`);
+                fetchAllScans();
+            } catch (error) {
+                console.error("Error deleting old scans:", error);
+                showNotification("Error", "Failed to delete old scans: " + error.message);
+            }
+        }
+    );
+}
+
 // ===== REAL-TIME LISTENER =====
 function setupRealtimeListener() {
     if (realtimeListener) {
@@ -363,6 +497,10 @@ document.getElementById('refreshBtn').addEventListener('click', () => {
 });
 
 document.getElementById('exportBtn').addEventListener('click', exportToCSV);
+
+document.getElementById('deleteAllBtn').addEventListener('click', deleteAllScans);
+
+document.getElementById('deleteOldBtn').addEventListener('click', deleteOldScans);
 
 document.getElementById('realtimeToggle').addEventListener('click', (e) => {
     isRealtimeEnabled = !isRealtimeEnabled;
