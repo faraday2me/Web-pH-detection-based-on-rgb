@@ -16,7 +16,7 @@ const firebaseConfig = {
 let db;
 let allScans = [];
 let phChart = null;
-let isRealtimeEnabled = true;
+let isRealtimeEnabled = false;
 let realtimeListener = null;
 
 // ===== FIREBASE INITIALIZATION (FIXED) =====
