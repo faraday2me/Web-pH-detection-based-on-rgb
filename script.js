@@ -19,19 +19,54 @@ let phChart = null;
 let isRealtimeEnabled = true;
 let realtimeListener = null;
 
-// ===== FIREBASE INITIALIZATION =====
+// ===== FIREBASE INITIALIZATION (FIXED) =====
 function initializeFirebase() {
     try {
-        firebase.initializeApp(firebaseConfig);
+        console.log("[Firebase] Initializing with config...");
+        console.log("[Firebase] Database URL:", firebaseConfig.databaseURL);
+        
+        // Check apakah Firebase sudah di-initialize
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+            console.log("[Firebase] ✓ SDK initialized");
+        }
+        
         db = firebase.database();
-        console.log("✓ Firebase initialized");
+        console.log("[Firebase] ✓ Database instance created");
+        
         showNotification("Success", "Connected to Firebase!");
         document.getElementById('deviceStatus').className = 'status-indicator online';
         document.getElementById('deviceStatus').textContent = '● Online';
+        
+        // Test connection
+        testFirebaseConnection();
+        
     } catch (error) {
-        console.error("✗ Firebase error:", error);
-        showNotification("Error", "Failed to connect to Firebase: " + error.message);
+        console.error("[Firebase] Initialization error:", error);
+        showNotification("Error", "Firebase Error: " + error.message);
         document.getElementById('deviceStatus').className = 'status-indicator offline';
+        document.getElementById('deviceStatus').textContent = '● Offline';
+    }
+}
+
+// ===== TEST FIREBASE CONNECTION =====
+function testFirebaseConnection() {
+    try {
+        console.log("[Firebase] Testing connection...");
+        
+        db.ref('.info/connected').on('value', (snapshot) => {
+            if (snapshot.val() === true) {
+                console.log("[Firebase] ✓ Connected to database");
+                document.getElementById('deviceStatus').className = 'status-indicator online';
+                document.getElementById('deviceStatus').textContent = '● Online';
+            } else {
+                console.log("[Firebase] ✗ Disconnected from database");
+                document.getElementById('deviceStatus').className = 'status-indicator offline';
+                document.getElementById('deviceStatus').textContent = '● Offline';
+            }
+        });
+    } catch (error) {
+        console.error("[Firebase] Connection test error:", error);
     }
 }
 
