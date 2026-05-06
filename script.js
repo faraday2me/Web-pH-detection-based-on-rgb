@@ -19,39 +19,59 @@ let phChart = null;
 let isRealtimeEnabled = false;
 let realtimeListener = null;
 
-// ===== FIREBASE INITIALIZATION (FIXED) =====
+// ===== FIREBASE INITIALIZATION (UPDATED) =====
 function initializeFirebase() {
     try {
         console.log("[Firebase] Starting initialization...");
-        
-        if (!firebase || !firebase.apps.length) {
+
+        // Initialize Firebase hanya sekali
+        if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
             console.log("[Firebase] App initialized successfully");
         }
-        
+
         db = firebase.database();
-        console.log("[Firebase] Database connected");
+        console.log("[Firebase] Database instance created");
 
         // Update status
-        const statusEl = document.getElementById('deviceStatus');
-        if (statusEl) {
-            statusEl.className = 'status-indicator online';
-            statusEl.innerHTML = '● Online';
-        }
+        updateConnectionStatus(true);
 
-        // Mulai realtime listener
-        if (isRealtimeEnabled) {
-            startRealtimeListener();
-        }
+        // Test koneksi
+        testFirebaseConnection();
 
     } catch (error) {
-        console.error("[Firebase] Error:", error);
-        const statusEl = document.getElementById('deviceStatus');
-        if (statusEl) {
+        console.error("[Firebase] Initialization Error:", error);
+        updateConnectionStatus(false);
+    }
+}
+
+// Helper untuk update status
+function updateConnectionStatus(isOnline) {
+    const statusEl = document.getElementById('deviceStatus');
+    if (statusEl) {
+        if (isOnline) {
+            statusEl.className = 'status-indicator online';
+            statusEl.innerHTML = '● Online';
+        } else {
             statusEl.className = 'status-indicator offline';
-            statusEl.innerHTML = '● Connection Failed';
+            statusEl.innerHTML = '● Offline';
         }
     }
+}
+
+// Test Connection
+function testFirebaseConnection() {
+    if (!db) return;
+
+    db.ref('.info/connected').on('value', (snapshot) => {
+        const isConnected = snapshot.val() === true;
+        console.log("[Firebase] Realtime connection:", isConnected ? "CONNECTED" : "DISCONNECTED");
+        updateConnectionStatus(isConnected);
+        
+        if (isConnected) {
+            fetchAllScans();   // ambil data
+        }
+    });
 }
 
 // ===== TEST FIREBASE CONNECTION =====
@@ -78,5 +98,7 @@ function testFirebaseConnection() {
     }
 }
 
-// REST OF CODE SAMA SEPERTI SEBELUMNYA...
-// (Copy semua function lainnya dari script.js lama)
+// Jalankan saat halaman selesai load
+window.addEventListener('load', () => {
+    initializeFirebase();
+});
