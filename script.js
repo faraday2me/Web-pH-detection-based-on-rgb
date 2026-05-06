@@ -34,34 +34,23 @@ function updateConnectionStatus(isOnline) {
 }
 
 function fetchAllScans() {
-    if (!db) {
-        console.error("[Firebase] Database belum siap");
-        return;
-    }
-    
-    console.log("[Firebase] Fetching all scans...");
+    if (!db) return;
     
     db.ref('scans').once('value', (snapshot) => {
         allScans = [];
-        
-        snapshot.forEach((child) => {
-            const data = child.val();
-            allScans.push(data);
+        snapshot.forEach(child => {
+            allScans.push(child.val());
         });
 
-        console.log(`[Firebase] Loaded ${allScans.length} scans`);
-        
-        // Update semua tampilan
+        console.log(`[Firebase] Loaded ${allScans.length} scans`, allScans);
+
         if (allScans.length > 0) {
-            const latest = allScans[allScans.length - 1];  // data terbaru
-            updateCurrentReading(latest);
+            updateCurrentReading(allScans[allScans.length - 1]); // data terbaru
         }
-        
+
         renderTable();
         renderChart();
-        
-    }, (error) => {
-        console.error("[Firebase] Error fetching data:", error);
+
     });
 }
 
@@ -92,22 +81,50 @@ function renderTable() {
 }
 
 // ===== UPDATE CURRENT READING & STATUS =====
+// Update Current Reading (Paling penting)
 function updateCurrentReading(scan) {
     if (!scan) return;
 
-    document.getElementById('currentPH').textContent = scan.ph ? scan.ph.toFixed(2) : '--';
-    document.getElementById('currentRGB').textContent = scan.rgb || '(--, --, --)';
-    document.getElementById('currentRawRGB').textContent = scan.rawRGB || '(--, --, --)';
-    document.getElementById('currentTimestamp').textContent = scan.timestamp ? 
-        new Date(scan.timestamp).toLocaleString('id-ID') : '--';
+    console.log("[UI] Updating with scan:", scan);
 
+    // pH
+    document.getElementById('currentPH').textContent = scan.ph ? Number(scan.ph).toFixed(2) : '--';
+
+    // RGB
+    let rgbText = '(--, --, --)';
+    if (scan.rgb) {
+        rgbText = Array.isArray(scan.rgb) ? `(${scan.rgb.join(', ')})` : scan.rgb;
+    }
+    document.getElementById('currentRGB').textContent = rgbText;
+
+    // Raw RGB
+    let rawText = '(--, --, --)';
+    if (scan.rawRGB) {
+        rawText = typeof scan.rawRGB === 'object' ? 
+                  `[${Object.values(scan.rawRGB).join(', ')}]` : scan.rawRGB;
+    }
+    document.getElementById('currentRawRGB').textContent = rawText;
+
+    // Timestamp
+    let timeStr = '--';
+    if (scan.timestamp) {
+        const date = new Date(scan.timestamp);
+        if (!isNaN(date.getTime())) {
+            timeStr = date.toLocaleString('id-ID');
+        }
+    }
+    document.getElementById('currentTimestamp').textContent = timeStr;
+
+    // Status
     const statusEl = document.getElementById('currentStatus');
-    statusEl.textContent = scan.status || '--';
+    const status = scan.status || 'Caution';
+    statusEl.textContent = status.toUpperCase();
 
-    if (scan.status === "Fresh") statusEl.className = "reading-status fresh";
-    else if (scan.status === "Caution") statusEl.className = "reading-status caution";
-    else if (scan.status === "Rotten") statusEl.className = "reading-status rotten";
+    if (status.toLowerCase() === 'fresh') statusEl.className = 'reading-status fresh';
+    else if (status.toLowerCase() === 'caution') statusEl.className = 'reading-status caution';
+    else if (status.toLowerCase() === 'rotten') statusEl.className = 'reading-status rotten';
 }
+
 
 // ===== RENDER TABLE =====
 function renderTable() {
