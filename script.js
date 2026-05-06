@@ -23,32 +23,34 @@ let realtimeListener = null;
 function initializeFirebase() {
     try {
         console.log("[Firebase] Starting initialization...");
-        console.log("[Firebase] Config:", firebaseConfig);
         
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        console.log("[Firebase] ✓ App initialized");
+        if (!firebase || !firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+            console.log("[Firebase] App initialized successfully");
+        }
         
-        // Get database reference
         db = firebase.database();
-        console.log("[Firebase] ✓ Database reference created");
-        console.log("[Firebase] Database URL:", firebaseConfig.databaseURL);
-        
-        showNotification("Connected", "Firebase connected!");
-        document.getElementById('deviceStatus').className = 'status-indicator online';
-        document.getElementById('deviceStatus').textContent = '● Online';
-        
-        // Test connection
-        setTimeout(() => {
-            testFirebaseConnection();
-        }, 500);
-        
+        console.log("[Firebase] Database connected");
+
+        // Update status
+        const statusEl = document.getElementById('deviceStatus');
+        if (statusEl) {
+            statusEl.className = 'status-indicator online';
+            statusEl.innerHTML = '● Online';
+        }
+
+        // Mulai realtime listener
+        if (isRealtimeEnabled) {
+            startRealtimeListener();
+        }
+
     } catch (error) {
-        console.error("[Firebase] Initialization failed:", error);
-        console.error("[Firebase] Error message:", error.message);
-        showNotification("Error", "Firebase Error: " + error.message);
-        document.getElementById('deviceStatus').className = 'status-indicator offline';
-        document.getElementById('deviceStatus').textContent = '● Offline';
+        console.error("[Firebase] Error:", error);
+        const statusEl = document.getElementById('deviceStatus');
+        if (statusEl) {
+            statusEl.className = 'status-indicator offline';
+            statusEl.innerHTML = '● Connection Failed';
+        }
     }
 }
 
