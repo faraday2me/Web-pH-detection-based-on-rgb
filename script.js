@@ -57,20 +57,16 @@ const statusClass = st => {
     return 'unknown';
 };
 const statusColor = st => {
-    if (st === 'FRESH')   return '#00e676';
-    if (st === 'CAUTION') return '#ffab00';
-    if (st === 'ROTTEN')  return '#ff1744';
-    return '#546e7a';
+    if (st === 'FRESH')   return '#00875a';
+    if (st === 'CAUTION') return '#b45309';
+    if (st === 'ROTTEN')  return '#c0392b';
+    return '#5c6b82';
 };
 
 // ── UI setters ──
 function set(id, text) {
     const el = document.getElementById(id);
     if (el) el.textContent = text;
-}
-function setClass(id, cls) {
-    const el = document.getElementById(id);
-    if (el) el.className = cls;
 }
 
 // ── Connection status ──
@@ -95,12 +91,20 @@ function updateReading(scan) {
     // pH ring
     const phNum = ph != null ? Number(ph) : null;
     set('phNumber', phNum != null ? phNum.toFixed(1) : '--');
+
+    const circumference = 314.16; // 2π × 50
     const progress = phNum != null ? phNum / 14 : 0;
-    const circumference = 339.29;
     const fill = document.getElementById('phRingFill');
     if (fill) {
         fill.style.strokeDashoffset = circumference * (1 - progress);
         fill.style.stroke = color;
+    }
+
+    // pH scale bar indicator
+    const indicator = document.getElementById('phIndicator');
+    if (indicator && phNum != null) {
+        indicator.style.left = `${(phNum / 14) * 100}%`;
+        indicator.style.background = color;
     }
 
     // status pill
@@ -109,13 +113,20 @@ function updateReading(scan) {
 
     set('meaningText', getMeaning(scan) || '--');
 
-    // RGB bars
+    // RGB bars + swatch
+    const r = rgb.r ?? 128, g = rgb.g ?? 128, b = rgb.b ?? 128;
     ['r','g','b'].forEach(ch => {
         const val = rgb[ch];
         set(`rgb${ch.toUpperCase()}`, val ?? '--');
         const bar = document.getElementById(`bar${ch.toUpperCase()}`);
         if (bar) bar.style.width = (val != null ? (val / 255 * 100) : 0) + '%';
     });
+
+    // Update color swatch
+    const swatch = document.getElementById('rgbSwatch');
+    if (swatch && rgb.r != null) {
+        swatch.style.background = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+    }
 
     // meta
     set('metaTimestamp', formatDate(scan));
@@ -129,15 +140,13 @@ function updateReading(scan) {
 
 // ── Stats ──
 function updateStats() {
-    set('statTotal',   allScans.length);
+    set('statTotal', allScans.length);
     if (allScans.length === 0) {
-        set('statAvg', '--'); set('statFresh', '0');
-        set('statCaution', '0'); set('statRotten', '0');
+        set('statFresh', '0');
+        set('statCaution', '0');
+        set('statRotten', '0');
         return;
     }
-    const vals = allScans.map(s => getPH(s)).filter(v => v != null).map(Number);
-    const avg  = vals.length ? (vals.reduce((a,b) => a+b, 0) / vals.length).toFixed(1) : '--';
-    set('statAvg',     avg);
     set('statFresh',   allScans.filter(s => getStatus(s) === 'FRESH').length);
     set('statCaution', allScans.filter(s => getStatus(s) === 'CAUTION').length);
     set('statRotten',  allScans.filter(s => getStatus(s) === 'ROTTEN').length);
@@ -166,19 +175,20 @@ function buildChart() {
             datasets: [{
                 label: 'pH',
                 data: phVals,
-                borderColor: 'rgba(79,195,247,0.6)',
+                borderColor: 'rgba(29,78,216,0.5)',
                 backgroundColor: ctx => {
-                    const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 260);
-                    g.addColorStop(0, 'rgba(79,195,247,0.12)');
-                    g.addColorStop(1, 'rgba(79,195,247,0.00)');
+                    const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 240);
+                    g.addColorStop(0, 'rgba(29,78,216,0.08)');
+                    g.addColorStop(1, 'rgba(29,78,216,0.00)');
                     return g;
                 },
                 pointBackgroundColor: ptColors,
-                pointBorderColor: ptColors,
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 1.5,
                 pointRadius: 4,
                 pointHoverRadius: 6,
                 tension: 0.35,
-                borderWidth: 2,
+                borderWidth: 1.5,
                 fill: true,
                 spanGaps: true
             }]
@@ -190,14 +200,15 @@ function buildChart() {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: '#181c23',
-                    borderColor: '#2a3040',
+                    backgroundColor: '#ffffff',
+                    borderColor: '#dde1e8',
                     borderWidth: 1,
-                    titleFont:   { family: 'Space Mono', size: 10 },
-                    bodyFont:    { family: 'Space Mono', size: 10 },
-                    titleColor:  '#7c8898',
-                    bodyColor:   '#e8eaf0',
+                    titleFont:   { family: 'IBM Plex Mono', size: 10 },
+                    bodyFont:    { family: 'IBM Plex Mono', size: 10 },
+                    titleColor:  '#475569',
+                    bodyColor:   '#0f172a',
                     padding: 10,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                     callbacks: {
                         title: items => {
                             const s = recent[items[0].dataIndex];
@@ -216,14 +227,14 @@ function buildChart() {
             },
             scales: {
                 x: {
-                    grid:  { color: '#1f2530', drawBorder: false },
-                    ticks: { font: { family: 'Space Mono', size: 9 }, color: '#3d4555', maxTicksLimit: 10 }
+                    grid:  { color: '#f0f2f5', drawBorder: false },
+                    ticks: { font: { family: 'IBM Plex Mono', size: 9 }, color: '#94a3b8', maxTicksLimit: 10 }
                 },
                 y: {
                     min: 0, max: 14,
-                    grid:  { color: '#1f2530', drawBorder: false },
+                    grid:  { color: '#f0f2f5', drawBorder: false },
                     ticks: {
-                        font: { family: 'Space Mono', size: 9 }, color: '#3d4555',
+                        font: { family: 'IBM Plex Mono', size: 9 }, color: '#94a3b8',
                         stepSize: 2,
                         callback: v => `${v}`
                     },
@@ -306,7 +317,7 @@ function initFirebase() {
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         db = firebase.database();
         db.ref('.info/connected').on('value', s => setOnline(s.val() === true));
-        startRealtime(); // << realtime ON by default at load
+        startRealtime();
     } catch (err) {
         console.error('[Firebase] init failed:', err);
         setOnline(false);
@@ -321,12 +332,12 @@ window.addEventListener('load', () => {
     rtBtn.addEventListener('click', () => {
         if (isRealtimeOn) {
             stopRealtime();
-            rtBtn.textContent = 'REALTIME OFF';
-            rtBtn.classList.remove('active');
+            rtBtn.textContent = '○ Realtime OFF';
+            rtBtn.classList.remove('btn-active');
         } else {
             startRealtime();
-            rtBtn.textContent = 'REALTIME ON';
-            rtBtn.classList.add('active');
+            rtBtn.textContent = '● Realtime ON';
+            rtBtn.classList.add('btn-active');
         }
     });
 

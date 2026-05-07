@@ -8,6 +8,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="style.css">
 </head>
@@ -17,15 +18,23 @@
 <header class="header">
     <div class="header-inner">
         <div class="header-left">
-            <div class="logo-badge">PH-DETECT</div>
-            <span class="header-title">pH Detection Dashboard — ESP32 + TCS3200</span>
+            <div class="logo-badge">
+                <span class="logo-icon">⬡</span>
+                PH-DETECT
+            </div>
+            <div class="header-divider"></div>
+            <span class="header-title">pH Detection Dashboard</span>
+            <span class="header-subtitle">ESP32 + TCS3200 Color Sensor</span>
         </div>
         <div class="header-right">
             <div class="conn-status">
                 <div id="connDot" class="conn-dot offline"></div>
                 <span id="connText">OFFLINE</span>
             </div>
-            <span id="lastUpdate" class="last-update-text">--</span>
+            <div class="last-update-wrap">
+                <span class="last-update-label">LAST UPDATE</span>
+                <span id="lastUpdate" class="last-update-text">--</span>
+            </div>
         </div>
     </div>
 </header>
@@ -40,21 +49,38 @@
         <div class="card">
             <div class="card-header">
                 <span class="card-label">Current Reading</span>
-                <span class="card-tag">Live</span>
+                <span class="card-tag live-tag"><span class="live-dot"></span>LIVE</span>
             </div>
             <div class="ph-main">
                 <div class="ph-ring">
                     <svg viewBox="0 0 120 120">
-                        <circle class="track" cx="60" cy="60" r="54"/>
-                        <circle class="fill" id="phRingFill" cx="60" cy="60" r="54"/>
+                        <circle class="track" cx="60" cy="60" r="50"/>
+                        <circle class="fill" id="phRingFill" cx="60" cy="60" r="50"/>
                     </svg>
                     <div class="ph-center">
+                        <div class="ph-label-top">pH</div>
                         <div id="phNumber" class="ph-number">--</div>
-                        <div class="ph-unit">pH</div>
+                        <div class="ph-scale">/ 14</div>
                     </div>
                 </div>
                 <div id="statusPill" class="status-pill unknown">--</div>
                 <div id="meaningText" class="meaning-text">--</div>
+            </div>
+
+            <!-- pH Scale Bar -->
+            <div class="ph-scale-bar">
+                <div class="ph-bar-track">
+                    <div class="ph-bar-segment acid"></div>
+                    <div class="ph-bar-segment neutral"></div>
+                    <div class="ph-bar-segment base"></div>
+                    <div id="phIndicator" class="ph-bar-indicator" style="left:50%"></div>
+                </div>
+                <div class="ph-bar-labels">
+                    <span>0</span><span>4</span><span>7</span><span>10</span><span>14</span>
+                </div>
+                <div class="ph-bar-text-labels">
+                    <span>Acid</span><span style="margin-left:auto">Base</span>
+                </div>
             </div>
         </div>
 
@@ -65,21 +91,31 @@
                 <span class="card-tag">TCS3200</span>
             </div>
             <div class="card-body">
+                <div class="rgb-swatch-row">
+                    <div id="rgbSwatch" class="rgb-swatch" style="background: rgb(128,128,128)"></div>
+                    <div class="rgb-swatch-label">Detected Color</div>
+                </div>
                 <div class="rgb-grid">
                     <div class="rgb-channel ch-r">
-                        <span class="ch-label">RED</span>
+                        <div class="ch-top">
+                            <span class="ch-label">R</span>
+                            <div id="rgbR" class="ch-val">--</div>
+                        </div>
                         <div class="ch-bar"><div id="barR" class="ch-fill" style="width:0%"></div></div>
-                        <div id="rgbR" class="ch-val">--</div>
                     </div>
                     <div class="rgb-channel ch-g">
-                        <span class="ch-label">GREEN</span>
+                        <div class="ch-top">
+                            <span class="ch-label">G</span>
+                            <div id="rgbG" class="ch-val">--</div>
+                        </div>
                         <div class="ch-bar"><div id="barG" class="ch-fill" style="width:0%"></div></div>
-                        <div id="rgbG" class="ch-val">--</div>
                     </div>
                     <div class="rgb-channel ch-b">
-                        <span class="ch-label">BLUE</span>
+                        <div class="ch-top">
+                            <span class="ch-label">B</span>
+                            <div id="rgbB" class="ch-val">--</div>
+                        </div>
                         <div class="ch-bar"><div id="barB" class="ch-fill" style="width:0%"></div></div>
-                        <div id="rgbB" class="ch-val">--</div>
                     </div>
                 </div>
                 <div class="meta-row">
@@ -104,21 +140,17 @@
                 <span class="sc-label">Total Scans</span>
                 <div id="statTotal" class="sc-val">0</div>
             </div>
-            <div class="stat-cell">
-                <span class="sc-label">Avg pH</span>
-                <div id="statAvg" class="sc-val">--</div>
-            </div>
-            <div class="stat-cell">
+            <div class="stat-cell stat-fresh">
                 <span class="sc-label">Fresh</span>
-                <div id="statFresh" class="sc-val fresh">0</div>
+                <div id="statFresh" class="sc-val">0</div>
             </div>
-            <div class="stat-cell">
+            <div class="stat-cell stat-caution">
                 <span class="sc-label">Caution</span>
-                <div id="statCaution" class="sc-val caution">0</div>
+                <div id="statCaution" class="sc-val">0</div>
             </div>
-            <div class="stat-cell">
+            <div class="stat-cell stat-rotten">
                 <span class="sc-label">Rotten</span>
-                <div id="statRotten" class="sc-val rotten">0</div>
+                <div id="statRotten" class="sc-val">0</div>
             </div>
         </div>
 
@@ -126,7 +158,11 @@
         <div class="card">
             <div class="card-header">
                 <span class="card-label">pH Trend — 60 Scan Terakhir</span>
-                <span class="card-tag">Chart.js</span>
+                <div class="chart-legend">
+                    <span class="legend-dot fresh"></span><span class="legend-text">Fresh</span>
+                    <span class="legend-dot caution"></span><span class="legend-text">Caution</span>
+                    <span class="legend-dot rotten"></span><span class="legend-text">Rotten</span>
+                </div>
             </div>
             <div class="chart-wrap">
                 <canvas id="phChart"></canvas>
@@ -139,9 +175,9 @@
                 <span class="card-label">Scan History</span>
             </div>
             <div class="toolbar">
-                <button id="btnRefresh"   class="btn">Refresh</button>
-                <button id="btnRealtime"  class="btn active">Realtime ON</button>
-                <button id="btnExport"    class="btn btn-export">Export CSV</button>
+                <button id="btnRefresh"   class="btn">↺ Refresh</button>
+                <button id="btnRealtime"  class="btn btn-active">● Realtime ON</button>
+                <button id="btnExport"    class="btn btn-export">↓ Export CSV</button>
                 <button id="btnDeleteOld" class="btn btn-danger">Hapus Lama</button>
                 <button id="btnDeleteAll" class="btn btn-danger">Hapus Semua</button>
             </div>
@@ -164,124 +200,16 @@
             </div>
         </div>
 
-        <!-- Firebase Setup Guide -->
-        <div class="card guide-section">
-            <div class="card-header">
-                <span class="card-label">Firebase Setup Guide — Membuat Project Baru</span>
-                <span class="card-tag">Optional</span>
-            </div>
-            <div class="card-body">
-
-                <div class="alert-box alert-info" style="margin-bottom: 20px;">
-                    Firebase yang terhubung sekarang sudah aktif dan data realtime berjalan. Panduan ini untuk referensi jika perlu membuat project Firebase baru.
-                </div>
-
-                <div class="guide-steps">
-
-                    <div class="guide-step">
-                        <div class="step-num">01</div>
-                        <div class="step-content">
-                            <div class="step-title">Buat Project Firebase</div>
-                            <div class="step-desc">
-                                Buka <strong style="color:#4fc3f7">console.firebase.google.com</strong>, login dengan akun Google, lalu klik <strong>Add project</strong>.
-                                Beri nama project, nonaktifkan Google Analytics jika tidak diperlukan, lalu klik <strong>Create project</strong>.
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="guide-step">
-                        <div class="step-num">02</div>
-                        <div class="step-content">
-                            <div class="step-title">Aktifkan Realtime Database</div>
-                            <div class="step-desc">
-                                Di sidebar Firebase Console, pilih <strong>Build → Realtime Database</strong>, klik <strong>Create Database</strong>.
-                                Pilih region <span class="code-inline">asia-southeast1 (Singapore)</span> untuk latensi rendah dari Indonesia,
-                                lalu pilih <strong>Start in test mode</strong> agar bisa read/write dulu.
-                            </div>
-                            <div class="alert-box alert-warning">
-                                Test mode hanya berlaku 30 hari. Setelah itu, buat rules yang lebih ketat untuk produksi.
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="guide-step">
-                        <div class="step-num">03</div>
-                        <div class="step-content">
-                            <div class="step-title">Daftarkan Web App</div>
-                            <div class="step-desc">
-                                Di halaman utama project, klik ikon <strong>Web (&lt;/&gt;)</strong> untuk mendaftarkan app.
-                                Beri nama app, lalu klik <strong>Register app</strong>. Firebase akan menampilkan <strong>firebaseConfig</strong> seperti ini:
-                            </div>
-                            <div class="config-box">
-<span class="key">apiKey</span>:            <span class="val">"AIzaSy..."</span>,
-<span class="key">authDomain</span>:        <span class="val">"nama-project.firebaseapp.com"</span>,
-<span class="key">databaseURL</span>:       <span class="val">"https://nama-project-default-rtdb.firebaseio.com"</span>,
-<span class="key">projectId</span>:         <span class="val">"nama-project"</span>,
-<span class="key">storageBucket</span>:     <span class="val">"nama-project.appspot.com"</span>,
-<span class="key">messagingSenderId</span>: <span class="val">"123456789"</span>,
-<span class="key">appId</span>:             <span class="val">"1:123456789:web:abcdef"</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="guide-step">
-                        <div class="step-num">04</div>
-                        <div class="step-content">
-                            <div class="step-title">Update Config di script.js &amp; config.h</div>
-                            <div class="step-desc">
-                                Ganti nilai <span class="code-inline">firebaseConfig</span> di bagian atas <strong>script.js</strong> dengan config baru.
-                                Di Arduino, buka <strong>config.h</strong> dan ganti nilai <span class="code-inline">FIREBASE_DB_URL</span>:
-                            </div>
-                            <div class="code-block">#define FIREBASE_DB_URL "https://nama-project-default-rtdb.firebaseio.com"
-#define DEVICE_ID       "esp32-ph-01"</div>
-                        </div>
-                    </div>
-
-                    <div class="guide-step">
-                        <div class="step-num">05</div>
-                        <div class="step-content">
-                            <div class="step-title">Set Database Rules</div>
-                            <div class="step-desc">
-                                Pergi ke <strong>Realtime Database → Rules</strong>. Untuk development, gunakan:
-                            </div>
-                            <div class="code-block">{
-  "rules": {
-    ".read":  true,
-    ".write": true
-  }
-}</div>
-                            <div class="alert-box alert-warning" style="margin-top:8px">
-                                Jangan gunakan rules terbuka di production. Tambahkan autentikasi atau batasi IP setelah testing selesai.
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="guide-step">
-                        <div class="step-num">06</div>
-                        <div class="step-content">
-                            <div class="step-title">Verifikasi Koneksi</div>
-                            <div class="step-desc">
-                                Upload kode ke ESP32, buka Serial Monitor di Arduino IDE (baud <span class="code-inline">115200</span>).
-                                Tekan tombol scan, pastikan muncul log <span class="code-inline">[Firebase] SUCCESS!</span>.
-                                Di dashboard ini, indikator pojok kanan atas harus berubah menjadi <strong style="color:#00e676">ONLINE</strong> dan data muncul secara realtime.
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-
     </main>
 </div>
 
 <!-- FOOTER -->
-<div style="max-width:1400px;margin:0 auto;">
-    <footer class="footer">
+<footer class="footer">
+    <div class="footer-inner">
         <span class="footer-text">pH Detection System — ESP32 + TCS3200 + Firebase Realtime Database</span>
         <span id="footerTime" class="footer-text">--</span>
-    </footer>
-</div>
+    </div>
+</footer>
 
 <script src="script.js"></script>
 </body>
