@@ -4,126 +4,285 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>pH Detection Dashboard</title>
-    
+
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    
+
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="header">
-        <div class="container">
-            <div class="header-content">
-                <h1>🔬 pH Detection Dashboard</h1>
-                <div class="status-bar">
-                    <div id="deviceStatus" class="status-indicator offline">● Offline</div>
-                    <div id="lastUpdateTime" class="last-update">Last update: --</div>
+
+<!-- ═══════════════════════════ HEADER ═══════════════════════════ -->
+<header class="header">
+    <div class="header-inner">
+        <div class="header-left">
+            <div class="logo-badge">PH-DETECT</div>
+            <span class="header-title">pH Detection Dashboard — ESP32 + TCS3200</span>
+        </div>
+        <div class="header-right">
+            <div class="conn-status">
+                <div id="connDot" class="conn-dot offline"></div>
+                <span id="connText">OFFLINE</span>
+            </div>
+            <span id="lastUpdate" class="last-update-text">--</span>
+        </div>
+    </div>
+</header>
+
+<!-- ═══════════════════════════ BODY ═══════════════════════════ -->
+<div class="main-wrap">
+
+    <!-- ── LEFT COLUMN ── -->
+    <aside class="left-col">
+
+        <!-- Current pH -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-label">Current Reading</span>
+                <span class="card-tag">Live</span>
+            </div>
+            <div class="ph-main">
+                <div class="ph-ring">
+                    <svg viewBox="0 0 120 120">
+                        <circle class="track" cx="60" cy="60" r="54"/>
+                        <circle class="fill" id="phRingFill" cx="60" cy="60" r="54"/>
+                    </svg>
+                    <div class="ph-center">
+                        <div id="phNumber" class="ph-number">--</div>
+                        <div class="ph-unit">pH</div>
+                    </div>
+                </div>
+                <div id="statusPill" class="status-pill unknown">--</div>
+                <div id="meaningText" class="meaning-text">--</div>
+            </div>
+        </div>
+
+        <!-- RGB -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-label">Normalized RGB</span>
+                <span class="card-tag">TCS3200</span>
+            </div>
+            <div class="card-body">
+                <div class="rgb-grid">
+                    <div class="rgb-channel ch-r">
+                        <span class="ch-label">RED</span>
+                        <div class="ch-bar"><div id="barR" class="ch-fill" style="width:0%"></div></div>
+                        <div id="rgbR" class="ch-val">--</div>
+                    </div>
+                    <div class="rgb-channel ch-g">
+                        <span class="ch-label">GREEN</span>
+                        <div class="ch-bar"><div id="barG" class="ch-fill" style="width:0%"></div></div>
+                        <div id="rgbG" class="ch-val">--</div>
+                    </div>
+                    <div class="rgb-channel ch-b">
+                        <span class="ch-label">BLUE</span>
+                        <div class="ch-bar"><div id="barB" class="ch-fill" style="width:0%"></div></div>
+                        <div id="rgbB" class="ch-val">--</div>
+                    </div>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-key">Raw Frequency</span>
+                    <span id="metaRawRGB" class="meta-val">--</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-key">Timestamp</span>
+                    <span id="metaTimestamp" class="meta-val">--</span>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="container">
-        <div class="main-content">
+    </aside>
 
-            <div class="card current-reading">
-                <h2>📊 Current Reading</h2>
-                <div class="reading-grid">
-                    <div class="reading-item">
-                        <label>pH Value</label>
-                        <div id="currentPH" class="reading-value">--</div>
-                    </div>
-                    <div class="reading-item">
-                        <label>Status</label>
-                        <div id="currentStatus" class="reading-status unknown">--</div>
-                    </div>
-                    <div class="reading-item">
-                        <label>Meaning</label>
-                        <div id="currentMeaning" class="reading-meaning">--</div>
-                    </div>
-                </div>
-                <div class="reading-details">
-                    <p><strong>🎨 Normalized RGB:</strong> <span id="currentRGB">(--,--,--)</span></p>
-                    <p><strong>📡 Raw RGB (Frequency):</strong> <span id="currentRawRGB">(--,--,--)</span></p>
-                    <p><strong>⏰ Timestamp:</strong> <span id="currentTimestamp">--</span></p>
-                </div>
+    <!-- ── RIGHT COLUMN ── -->
+    <main class="right-col">
+
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat-cell">
+                <span class="sc-label">Total Scans</span>
+                <div id="statTotal" class="sc-val">0</div>
             </div>
-
-            <div class="card chart-section">
-                <h2>📈 pH Trend (50 Scan Terakhir)</h2>
-                <div class="chart-container">
-                    <canvas id="phChart"></canvas>
-                </div>
-                <div class="chart-info">
-                    🟢 Hijau = FRESH | 🟠 Orange = CAUTION | 🔴 Merah = ROTTEN
-                </div>
+            <div class="stat-cell">
+                <span class="sc-label">Avg pH</span>
+                <div id="statAvg" class="sc-val">--</div>
             </div>
-
-            <div class="card stats-section">
-                <h2>📌 Statistics</h2>
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <label>Total Scans</label>
-                        <div class="stat-value" id="totalScans">0</div>
-                    </div>
-                    <div class="stat-item">
-                        <label>Average pH</label>
-                        <div class="stat-value" id="avgPH">--</div>
-                    </div>
-                    <div class="stat-item">
-                        <label>Fresh 🟢</label>
-                        <div class="stat-value" id="freshCount">0</div>
-                    </div>
-                    <div class="stat-item">
-                        <label>Caution 🟠</label>
-                        <div class="stat-value" id="cautionCount">0</div>
-                    </div>
-                    <div class="stat-item">
-                        <label>Rotten 🔴</label>
-                        <div class="stat-value" id="rottenCount">0</div>
-                    </div>
-                </div>
+            <div class="stat-cell">
+                <span class="sc-label">Fresh</span>
+                <div id="statFresh" class="sc-val fresh">0</div>
             </div>
-
-            <div class="card history-section">
-                <div class="section-header">
-                    <h2>📋 Scan History</h2>
-                    <div class="section-controls">
-                        <button id="refreshBtn" class="btn btn-primary">🔄 Refresh</button>
-                        <button id="realtimeToggle" class="btn btn-info active">⏱️ Real-time: ON</button>
-                        <button id="exportBtn" class="btn btn-success">📥 Export CSV</button>
-                        <button id="deleteOldBtn" class="btn btn-warning">🗑️ Delete Old</button>
-                        <button id="deleteAllBtn" class="btn btn-danger">🗑️ Delete All</button>
-                    </div>
-                </div>
-                <div class="table-container">
-                    <table class="history-table">
-                        <thead>
-                            <tr>
-                                <th>Waktu</th>
-                                <th>pH</th>
-                                <th>Status</th>
-                                <th>Meaning</th>
-                                <th>RGB (R,G,B)</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tableBody">
-                            <tr><td colspan="6" class="loading">Loading data...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="stat-cell">
+                <span class="sc-label">Caution</span>
+                <div id="statCaution" class="sc-val caution">0</div>
             </div>
-
+            <div class="stat-cell">
+                <span class="sc-label">Rotten</span>
+                <div id="statRotten" class="sc-val rotten">0</div>
+            </div>
         </div>
-    </div>
 
-    <div class="footer">
-        <p>pH Detection System | ESP32 + Firebase + Web Dashboard</p>
-        <p>Last Update: <span id="footerTime">--</span></p>
-    </div>
+        <!-- Chart -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-label">pH Trend — 60 Scan Terakhir</span>
+                <span class="card-tag">Chart.js</span>
+            </div>
+            <div class="chart-wrap">
+                <canvas id="phChart"></canvas>
+            </div>
+        </div>
 
-    <script src="script.js"></script>
+        <!-- History Table -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-label">Scan History</span>
+            </div>
+            <div class="toolbar">
+                <button id="btnRefresh"   class="btn">Refresh</button>
+                <button id="btnRealtime"  class="btn active">Realtime ON</button>
+                <button id="btnExport"    class="btn btn-export">Export CSV</button>
+                <button id="btnDeleteOld" class="btn btn-danger">Hapus Lama</button>
+                <button id="btnDeleteAll" class="btn btn-danger">Hapus Semua</button>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Waktu</th>
+                            <th>pH</th>
+                            <th>Status</th>
+                            <th>Keterangan</th>
+                            <th>RGB (R, G, B)</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr><td colspan="6" class="empty-state">Menghubungkan ke Firebase...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Firebase Setup Guide -->
+        <div class="card guide-section">
+            <div class="card-header">
+                <span class="card-label">Firebase Setup Guide — Membuat Project Baru</span>
+                <span class="card-tag">Optional</span>
+            </div>
+            <div class="card-body">
+
+                <div class="alert-box alert-info" style="margin-bottom: 20px;">
+                    Firebase yang terhubung sekarang sudah aktif dan data realtime berjalan. Panduan ini untuk referensi jika perlu membuat project Firebase baru.
+                </div>
+
+                <div class="guide-steps">
+
+                    <div class="guide-step">
+                        <div class="step-num">01</div>
+                        <div class="step-content">
+                            <div class="step-title">Buat Project Firebase</div>
+                            <div class="step-desc">
+                                Buka <strong style="color:#4fc3f7">console.firebase.google.com</strong>, login dengan akun Google, lalu klik <strong>Add project</strong>.
+                                Beri nama project, nonaktifkan Google Analytics jika tidak diperlukan, lalu klik <strong>Create project</strong>.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="guide-step">
+                        <div class="step-num">02</div>
+                        <div class="step-content">
+                            <div class="step-title">Aktifkan Realtime Database</div>
+                            <div class="step-desc">
+                                Di sidebar Firebase Console, pilih <strong>Build → Realtime Database</strong>, klik <strong>Create Database</strong>.
+                                Pilih region <span class="code-inline">asia-southeast1 (Singapore)</span> untuk latensi rendah dari Indonesia,
+                                lalu pilih <strong>Start in test mode</strong> agar bisa read/write dulu.
+                            </div>
+                            <div class="alert-box alert-warning">
+                                Test mode hanya berlaku 30 hari. Setelah itu, buat rules yang lebih ketat untuk produksi.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="guide-step">
+                        <div class="step-num">03</div>
+                        <div class="step-content">
+                            <div class="step-title">Daftarkan Web App</div>
+                            <div class="step-desc">
+                                Di halaman utama project, klik ikon <strong>Web (&lt;/&gt;)</strong> untuk mendaftarkan app.
+                                Beri nama app, lalu klik <strong>Register app</strong>. Firebase akan menampilkan <strong>firebaseConfig</strong> seperti ini:
+                            </div>
+                            <div class="config-box">
+<span class="key">apiKey</span>:            <span class="val">"AIzaSy..."</span>,
+<span class="key">authDomain</span>:        <span class="val">"nama-project.firebaseapp.com"</span>,
+<span class="key">databaseURL</span>:       <span class="val">"https://nama-project-default-rtdb.firebaseio.com"</span>,
+<span class="key">projectId</span>:         <span class="val">"nama-project"</span>,
+<span class="key">storageBucket</span>:     <span class="val">"nama-project.appspot.com"</span>,
+<span class="key">messagingSenderId</span>: <span class="val">"123456789"</span>,
+<span class="key">appId</span>:             <span class="val">"1:123456789:web:abcdef"</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="guide-step">
+                        <div class="step-num">04</div>
+                        <div class="step-content">
+                            <div class="step-title">Update Config di script.js &amp; config.h</div>
+                            <div class="step-desc">
+                                Ganti nilai <span class="code-inline">firebaseConfig</span> di bagian atas <strong>script.js</strong> dengan config baru.
+                                Di Arduino, buka <strong>config.h</strong> dan ganti nilai <span class="code-inline">FIREBASE_DB_URL</span>:
+                            </div>
+                            <div class="code-block">#define FIREBASE_DB_URL "https://nama-project-default-rtdb.firebaseio.com"
+#define DEVICE_ID       "esp32-ph-01"</div>
+                        </div>
+                    </div>
+
+                    <div class="guide-step">
+                        <div class="step-num">05</div>
+                        <div class="step-content">
+                            <div class="step-title">Set Database Rules</div>
+                            <div class="step-desc">
+                                Pergi ke <strong>Realtime Database → Rules</strong>. Untuk development, gunakan:
+                            </div>
+                            <div class="code-block">{
+  "rules": {
+    ".read":  true,
+    ".write": true
+  }
+}</div>
+                            <div class="alert-box alert-warning" style="margin-top:8px">
+                                Jangan gunakan rules terbuka di production. Tambahkan autentikasi atau batasi IP setelah testing selesai.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="guide-step">
+                        <div class="step-num">06</div>
+                        <div class="step-content">
+                            <div class="step-title">Verifikasi Koneksi</div>
+                            <div class="step-desc">
+                                Upload kode ke ESP32, buka Serial Monitor di Arduino IDE (baud <span class="code-inline">115200</span>).
+                                Tekan tombol scan, pastikan muncul log <span class="code-inline">[Firebase] SUCCESS!</span>.
+                                Di dashboard ini, indikator pojok kanan atas harus berubah menjadi <strong style="color:#00e676">ONLINE</strong> dan data muncul secara realtime.
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- FOOTER -->
+<div style="max-width:1400px;margin:0 auto;">
+    <footer class="footer">
+        <span class="footer-text">pH Detection System — ESP32 + TCS3200 + Firebase Realtime Database</span>
+        <span id="footerTime" class="footer-text">--</span>
+    </footer>
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>

@@ -1,324 +1,369 @@
-// ===== pH Detection Dashboard - Fixed Script =====
+// ===== pH Detection Dashboard — script.js =====
+
 const firebaseConfig = {
-  apiKey: "AIzaSyAHuCnBj49G60HptaJyHtinT_OSeDvfgmY",
-  authDomain: "ph-detection-based-on-rgb.firebaseapp.com",
-  databaseURL: "https://ph-detection-based-on-rgb-default-rtdb.firebaseio.com",
-  projectId: "ph-detection-based-on-rgb",
-  storageBucket: "ph-detection-based-on-rgb.firebasestorage.app",
-  messagingSenderId: "48403449960",
-  appId: "1:48403449960:web:d86dee6a856457436613dd",
-  measurementId: "G-T39CN1MLQF"
+    apiKey:            "AIzaSyAHuCnBj49G60HptaJyHtinT_OSeDvfgmY",
+    authDomain:        "ph-detection-based-on-rgb.firebaseapp.com",
+    databaseURL:       "https://ph-detection-based-on-rgb-default-rtdb.firebaseio.com",
+    projectId:         "ph-detection-based-on-rgb",
+    storageBucket:     "ph-detection-based-on-rgb.firebasestorage.app",
+    messagingSenderId: "48403449960",
+    appId:             "1:48403449960:web:d86dee6a856457436613dd",
 };
 
-let db;
-let allScans = [];
-let phChart = null;
-let realtimeListener = null;
-let isRealtimeOn = false;
+// ── State ──
+let db              = null;
+let allScans        = [];
+let phChart         = null;
+let realtimeRef     = null;
+let isRealtimeOn    = false;
 
-// ==================== HELPER FUNCTIONS ====================
-function getPH(scan)        { return scan.pH ?? scan.ph ?? null; }
-function getStatus(scan)    { return scan.status || ''; }
-function getMeaning(scan)   { return scan.meaning || ''; }
-function getTimestamp(scan) {
-    if (!scan.timestamp) return null;
-    const ts = Number(scan.timestamp);
-    return ts < 1e12 ? ts * 1000 : ts; // Unix seconds → milliseconds
-}
-function getRGBText(scan) {
-    const rgb = scan.normalizedRGB || scan.rgb;
-    if (!rgb) return '(--, --, --)';
+// ── Helpers ──
+const getPH        = s => s.pH ?? s.ph ?? null;
+const getStatus    = s => (s.status || '').toUpperCase();
+const getMeaning   = s => s.meaning || '';
+const getTimestamp = s => {
+    if (!s.timestamp) return null;
+    const t = Number(s.timestamp);
+    return t < 1e12 ? t * 1000 : t;
+};
+const getRGB       = s => {
+    const rgb = s.normalizedRGB || s.rgb;
+    if (!rgb) return { r: null, g: null, b: null };
     if (typeof rgb === 'object' && !Array.isArray(rgb))
-        return `(${rgb.r ?? '--'}, ${rgb.g ?? '--'}, ${rgb.b ?? '--'})`;
-    if (Array.isArray(rgb)) return `(${rgb.join(', ')})`;
-    return String(rgb);
-}
-function getRawRGBText(scan) {
-    const raw = scan.rawRGB;
+        return { r: rgb.r ?? null, g: rgb.g ?? null, b: rgb.b ?? null };
+    return { r: null, g: null, b: null };
+};
+const getRGBText   = s => {
+    const { r, g, b } = getRGB(s);
+    return `(${r ?? '--'}, ${g ?? '--'}, ${b ?? '--'})`;
+};
+const getRawRGBText = s => {
+    const raw = s.rawRGB;
     if (!raw) return '(--, --, --)';
     if (typeof raw === 'object' && !Array.isArray(raw))
         return `[${raw.r ?? '--'}, ${raw.g ?? '--'}, ${raw.b ?? '--'}]`;
     return String(raw);
-}
-function formatDate(scan) {
-    const ms = getTimestamp(scan);
+};
+const formatDate = s => {
+    const ms = getTimestamp(s);
     if (!ms) return '--';
     const d = new Date(ms);
     return isNaN(d.getTime()) ? '--' : d.toLocaleString('id-ID');
+};
+const statusClass = st => {
+    if (st === 'FRESH')   return 'fresh';
+    if (st === 'CAUTION') return 'caution';
+    if (st === 'ROTTEN')  return 'rotten';
+    return 'unknown';
+};
+const statusColor = st => {
+    if (st === 'FRESH')   return '#00e676';
+    if (st === 'CAUTION') return '#ffab00';
+    if (st === 'ROTTEN')  return '#ff1744';
+    return '#546e7a';
+};
+
+// ── UI setters ──
+function set(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+}
+function setClass(id, cls) {
+    const el = document.getElementById(id);
+    if (el) el.className = cls;
 }
 
-// ==================== UI UPDATE ====================
-function updateConnectionStatus(isOnline) {
-    const el = document.getElementById('deviceStatus');
-    if (!el) return;
-    el.className = isOnline ? 'status-indicator online' : 'status-indicator offline';
-    el.innerHTML = isOnline ? '● Online' : '● Offline';
+// ── Connection status ──
+function setOnline(online) {
+    const dot  = document.getElementById('connDot');
+    const text = document.getElementById('connText');
+    if (!dot || !text) return;
+    dot.className  = 'conn-dot ' + (online ? 'online' : 'offline');
+    text.textContent = online ? 'ONLINE' : 'OFFLINE';
 }
 
-function updateCurrentReading(scan) {
+// ── Current reading ──
+function updateReading(scan) {
     if (!scan) return;
 
-    const ph = getPH(scan);
-    document.getElementById('currentPH').textContent = ph != null ? Number(ph).toFixed(2) : '--';
+    const ph     = getPH(scan);
+    const status = getStatus(scan);
+    const sc     = statusClass(status);
+    const color  = statusColor(status);
+    const rgb    = getRGB(scan);
 
-    const statusEl = document.getElementById('currentStatus');
-    const status = getStatus(scan).toUpperCase();
-    statusEl.textContent = status || '--';
-    if (status === 'FRESH') statusEl.className = 'reading-status fresh';
-    else if (status === 'CAUTION') statusEl.className = 'reading-status caution';
-    else if (status === 'ROTTEN') statusEl.className = 'reading-status rotten';
-    else statusEl.className = 'reading-status unknown';
-
-    const meaningEl = document.getElementById('currentMeaning');
-    if (meaningEl) meaningEl.textContent = getMeaning(scan) || '--';
-
-    document.getElementById('currentRGB').textContent = getRGBText(scan);
-    document.getElementById('currentRawRGB').textContent = getRawRGBText(scan);
-    document.getElementById('currentTimestamp').textContent = formatDate(scan);
-
-    const now = new Date().toLocaleString('id-ID');
-    const lel = document.getElementById('lastUpdateTime');
-    if (lel) lel.textContent = 'Last update: ' + now;
-    const fel = document.getElementById('footerTime');
-    if (fel) fel.textContent = now;
-}
-
-function updateStatistics() {
-    document.getElementById('totalScans').textContent = allScans.length;
-    if (allScans.length === 0) {
-        document.getElementById('avgPH').textContent = '--';
-        document.getElementById('freshCount').textContent = '0';
-        document.getElementById('cautionCount').textContent = '0';
-        document.getElementById('rottenCount').textContent = '0';
-        return;
+    // pH ring
+    const phNum = ph != null ? Number(ph) : null;
+    set('phNumber', phNum != null ? phNum.toFixed(1) : '--');
+    const progress = phNum != null ? phNum / 14 : 0;
+    const circumference = 339.29;
+    const fill = document.getElementById('phRingFill');
+    if (fill) {
+        fill.style.strokeDashoffset = circumference * (1 - progress);
+        fill.style.stroke = color;
     }
-    const validPH = allScans.map(s => getPH(s)).filter(v => v != null).map(Number);
-    const avg = validPH.length > 0
-        ? (validPH.reduce((a, b) => a + b, 0) / validPH.length).toFixed(2)
-        : '--';
-    document.getElementById('avgPH').textContent = avg;
-    document.getElementById('freshCount').textContent   = allScans.filter(s => getStatus(s).toUpperCase() === 'FRESH').length;
-    document.getElementById('cautionCount').textContent = allScans.filter(s => getStatus(s).toUpperCase() === 'CAUTION').length;
-    document.getElementById('rottenCount').textContent  = allScans.filter(s => getStatus(s).toUpperCase() === 'ROTTEN').length;
-}
 
-function renderTable() {
-    const tbody = document.getElementById('tableBody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    if (allScans.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;">Belum ada data scan</td></tr>`;
-        return;
-    }
-    allScans.slice(-50).reverse().forEach(scan => {
-        const ph = getPH(scan);
-        const statusStr = getStatus(scan).toUpperCase();
-        let statusStyle = '';
-        if (statusStr === 'FRESH') statusStyle = 'color:green;font-weight:bold';
-        else if (statusStr === 'CAUTION') statusStyle = 'color:orange;font-weight:bold';
-        else if (statusStr === 'ROTTEN') statusStyle = 'color:red;font-weight:bold';
+    // status pill
+    const pill = document.getElementById('statusPill');
+    if (pill) { pill.textContent = status || '--'; pill.className = 'status-pill ' + sc; }
 
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${formatDate(scan)}</td>
-            <td><strong>${ph != null ? Number(ph).toFixed(2) : '-'}</strong></td>
-            <td style="${statusStyle}">${statusStr || '-'}</td>
-            <td>${getMeaning(scan) || '-'}</td>
-            <td>${getRGBText(scan)}</td>
-            <td>
-              <button class="btn btn-danger" style="padding:2px 8px;font-size:12px"
-                onclick="deleteScan('${scan._id || ''}')">🗑️</button>
-            </td>
-        `;
-        tbody.appendChild(row);
+    set('meaningText', getMeaning(scan) || '--');
+
+    // RGB bars
+    ['r','g','b'].forEach(ch => {
+        const val = rgb[ch];
+        set(`rgb${ch.toUpperCase()}`, val ?? '--');
+        const bar = document.getElementById(`bar${ch.toUpperCase()}`);
+        if (bar) bar.style.width = (val != null ? (val / 255 * 100) : 0) + '%';
     });
+
+    // meta
+    set('metaTimestamp', formatDate(scan));
+    set('metaRawRGB', getRawRGBText(scan));
+
+    // last update
+    const now = new Date().toLocaleString('id-ID');
+    set('lastUpdate', now);
+    set('footerTime', now);
 }
 
-function renderChart() {
-    const canvas = document.getElementById('phChart');
-    if (!canvas || allScans.length === 0) return;
-    if (phChart) phChart.destroy();
+// ── Stats ──
+function updateStats() {
+    set('statTotal',   allScans.length);
+    if (allScans.length === 0) {
+        set('statAvg', '--'); set('statFresh', '0');
+        set('statCaution', '0'); set('statRotten', '0');
+        return;
+    }
+    const vals = allScans.map(s => getPH(s)).filter(v => v != null).map(Number);
+    const avg  = vals.length ? (vals.reduce((a,b) => a+b, 0) / vals.length).toFixed(1) : '--';
+    set('statAvg',     avg);
+    set('statFresh',   allScans.filter(s => getStatus(s) === 'FRESH').length);
+    set('statCaution', allScans.filter(s => getStatus(s) === 'CAUTION').length);
+    set('statRotten',  allScans.filter(s => getStatus(s) === 'ROTTEN').length);
+}
 
-    const recent = allScans.slice(-50);
+// ── Chart ──
+function buildChart() {
+    const canvas = document.getElementById('phChart');
+    if (!canvas) return;
+
+    if (phChart) { phChart.destroy(); phChart = null; }
+    if (allScans.length === 0) return;
+
+    const recent = allScans.slice(-60);
     const labels = recent.map(s => {
         const ms = getTimestamp(s);
-        if (!ms) return '-';
-        return new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        return ms ? new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
     });
-    const phValues = recent.map(s => {
-        const v = getPH(s);
-        return v != null ? Number(v) : null;
-    });
-    const pointColors = recent.map(s => {
-        const st = getStatus(s).toUpperCase();
-        if (st === 'FRESH') return '#4CAF50';
-        if (st === 'CAUTION') return '#FF9800';
-        if (st === 'ROTTEN') return '#f44336';
-        return '#9E9E9E';
-    });
+    const phVals = recent.map(s => { const v = getPH(s); return v != null ? Number(v) : null; });
+    const ptColors = recent.map(s => statusColor(getStatus(s)));
 
-    phChart = new Chart(canvas, {
+    phChart = new Chart(canvas.getContext('2d'), {
         type: 'line',
         data: {
             labels,
             datasets: [{
-                label: 'pH Level',
-                data: phValues,
-                borderColor: '#4CAF50',
-                backgroundColor: 'rgba(76,175,80,0.1)',
-                pointBackgroundColor: pointColors,
-                pointRadius: 6,
-                tension: 0.4,
-                borderWidth: 3,
+                label: 'pH',
+                data: phVals,
+                borderColor: 'rgba(79,195,247,0.6)',
+                backgroundColor: ctx => {
+                    const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 260);
+                    g.addColorStop(0, 'rgba(79,195,247,0.12)');
+                    g.addColorStop(1, 'rgba(79,195,247,0.00)');
+                    return g;
+                },
+                pointBackgroundColor: ptColors,
+                pointBorderColor: ptColors,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.35,
+                borderWidth: 2,
+                fill: true,
                 spanGaps: true
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: { duration: 600, easing: 'easeOutQuart' },
             plugins: {
+                legend: { display: false },
                 tooltip: {
+                    backgroundColor: '#181c23',
+                    borderColor: '#2a3040',
+                    borderWidth: 1,
+                    titleFont:   { family: 'Space Mono', size: 10 },
+                    bodyFont:    { family: 'Space Mono', size: 10 },
+                    titleColor:  '#7c8898',
+                    bodyColor:   '#e8eaf0',
+                    padding: 10,
                     callbacks: {
-                        label: ctx => {
-                            const s = recent[ctx.dataIndex];
-                            return `pH: ${ctx.parsed.y} | Status: ${getStatus(s)} | ${getMeaning(s)}`;
+                        title: items => {
+                            const s = recent[items[0].dataIndex];
+                            return formatDate(s);
+                        },
+                        label: item => {
+                            const s = recent[item.dataIndex];
+                            return [
+                                `pH    : ${item.parsed.y}`,
+                                `Status: ${getStatus(s)}`,
+                                `RGB   : ${getRGBText(s)}`
+                            ];
                         }
                     }
                 }
             },
             scales: {
-                y: { min: 0, max: 14, title: { display: true, text: 'pH Value' } },
-                x: { title: { display: true, text: 'Waktu' } }
+                x: {
+                    grid:  { color: '#1f2530', drawBorder: false },
+                    ticks: { font: { family: 'Space Mono', size: 9 }, color: '#3d4555', maxTicksLimit: 10 }
+                },
+                y: {
+                    min: 0, max: 14,
+                    grid:  { color: '#1f2530', drawBorder: false },
+                    ticks: {
+                        font: { family: 'Space Mono', size: 9 }, color: '#3d4555',
+                        stepSize: 2,
+                        callback: v => `${v}`
+                    },
+                    title: { display: false }
+                }
             }
         }
     });
 }
 
-// ==================== DELETE ====================
-function deleteScan(scanId) {
-    if (!scanId || !db) { alert('ID tidak valid'); return; }
-    if (!confirm('Hapus data scan ini?')) return;
-    db.ref('scans/' + scanId).remove()
-        .then(() => console.log('[Firebase] Deleted:', scanId))
-        .catch(e => alert('Gagal hapus: ' + e.message));
+// ── Table ──
+function renderTable() {
+    const tbody = document.getElementById('tableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (allScans.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Belum ada data scan</td></tr>`;
+        return;
+    }
+
+    allScans.slice(-100).reverse().forEach(scan => {
+        const ph     = getPH(scan);
+        const status = getStatus(scan);
+        const sc     = statusClass(status);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${formatDate(scan)}</td>
+            <td class="td-ph">${ph != null ? Number(ph).toFixed(2) : '-'}</td>
+            <td><span class="badge ${sc}">${status || '-'}</span></td>
+            <td>${getMeaning(scan) || '-'}</td>
+            <td>${getRGBText(scan)}</td>
+            <td>
+                <button class="btn-del" onclick="deleteScan('${scan._id || ''}')">Del</button>
+            </td>`;
+        tbody.appendChild(tr);
+    });
 }
 
-function deleteOldScans() {
-    if (!db || allScans.length === 0) { alert('Tidak ada data'); return; }
-    if (allScans.length <= 50) { alert('Data kurang dari 50, tidak ada yang perlu dihapus'); return; }
-    const toDelete = allScans.slice(0, allScans.length - 50);
-    if (!confirm(`Hapus ${toDelete.length} data lama? (menyisakan 50 terbaru)`)) return;
-    const updates = {};
-    toDelete.forEach(s => { if (s._id) updates['scans/' + s._id] = null; });
-    db.ref().update(updates)
-        .then(() => alert('Data lama berhasil dihapus'))
-        .catch(e => alert('Gagal: ' + e.message));
-}
-
-// ==================== FIREBASE ====================
-function processSnapshot(snapshot) {
+// ── Process snapshot ──
+function processSnapshot(snap) {
     allScans = [];
-    snapshot.forEach(child => {
-        const val = child.val();
-        val._id = child.key;
-        allScans.push(val);
+    snap.forEach(child => {
+        const v  = child.val();
+        v._id    = child.key;
+        allScans.push(v);
     });
     allScans.sort((a, b) => (getTimestamp(a) || 0) - (getTimestamp(b) || 0));
-    console.log(`[Firebase] ${allScans.length} scans loaded`);
 
-    if (allScans.length > 0) updateCurrentReading(allScans[allScans.length - 1]);
+    if (allScans.length > 0) updateReading(allScans[allScans.length - 1]);
+    updateStats();
     renderTable();
-    renderChart();
-    updateStatistics();
+    buildChart();
 }
 
-function fetchAllScans() {
-    if (!db) return;
-    const tbody = document.getElementById('tableBody');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px">⏳ Memuat data...</td></tr>';
+// ── Delete ──
+window.deleteScan = function(id) {
+    if (!id || !db) return;
+    if (!confirm('Hapus data ini?')) return;
+    db.ref('scans/' + id).remove().catch(e => alert('Gagal: ' + e.message));
+};
 
-    db.ref('scans').once('value', processSnapshot, error => {
-        console.error('[Firebase] Error:', error);
-        updateConnectionStatus(false);
-        if (tbody) tbody.innerHTML = `
-          <tr><td colspan="6" style="text-align:center;color:red;padding:20px">
-            ❌ Gagal membaca data: <strong>${error.message}</strong><br><br>
-            Buka <strong>Firebase Console → Realtime Database → Rules</strong><br>
-            Set: <code>{ "rules": { ".read": true, ".write": true } }</code>
-          </td></tr>`;
-    });
-}
-
-function startRealtimeListener() {
-    if (!db || realtimeListener) return;
-    realtimeListener = db.ref('scans').on('value', processSnapshot, err => {
-        console.error('[Realtime] Error:', err);
-    });
+// ── Firebase ──
+function startRealtime() {
+    if (!db || realtimeRef) return;
+    realtimeRef = db.ref('scans');
+    realtimeRef.on('value', processSnapshot, err => console.error('[RT]', err));
     isRealtimeOn = true;
 }
 
-function stopRealtimeListener() {
-    if (!db) return;
-    db.ref('scans').off('value', realtimeListener);
-    realtimeListener = null;
-    isRealtimeOn = false;
+function stopRealtime() {
+    if (!db || !realtimeRef) return;
+    realtimeRef.off('value');
+    realtimeRef   = null;
+    isRealtimeOn  = false;
 }
 
-function initializeFirebase() {
+function initFirebase() {
     try {
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         db = firebase.database();
-        db.ref('.info/connected').on('value', snap => updateConnectionStatus(snap.val() === true));
-        fetchAllScans();
+        db.ref('.info/connected').on('value', s => setOnline(s.val() === true));
+        startRealtime(); // << realtime ON by default at load
     } catch (err) {
-        console.error('[Firebase] Init failed:', err);
-        updateConnectionStatus(false);
+        console.error('[Firebase] init failed:', err);
+        setOnline(false);
     }
 }
 
-// ==================== INIT ====================
+// ── Event bindings ──
 window.addEventListener('load', () => {
-    initializeFirebase();
+    initFirebase();
 
-    document.getElementById('refreshBtn').addEventListener('click', () => {
-        if (!isRealtimeOn && db) fetchAllScans();
-        else if (isRealtimeOn) alert('Real-time aktif — data otomatis diperbarui');
-    });
-
-    document.getElementById('realtimeToggle').addEventListener('click', function() {
+    const rtBtn = document.getElementById('btnRealtime');
+    rtBtn.addEventListener('click', () => {
         if (isRealtimeOn) {
-            stopRealtimeListener();
-            this.textContent = '⏱️ Real-time: OFF';
-            this.classList.remove('active');
+            stopRealtime();
+            rtBtn.textContent = 'REALTIME OFF';
+            rtBtn.classList.remove('active');
         } else {
-            startRealtimeListener();
-            this.textContent = '⏱️ Real-time: ON';
-            this.classList.add('active');
+            startRealtime();
+            rtBtn.textContent = 'REALTIME ON';
+            rtBtn.classList.add('active');
         }
     });
 
-    document.getElementById('exportBtn').addEventListener('click', () => {
+    document.getElementById('btnRefresh').addEventListener('click', () => {
+        if (isRealtimeOn) return;
+        if (!db) return;
+        db.ref('scans').once('value', processSnapshot);
+    });
+
+    document.getElementById('btnExport').addEventListener('click', () => {
         if (allScans.length === 0) { alert('Belum ada data'); return; }
         let csv = 'Timestamp,pH,Status,Meaning,NormalizedRGB,RawRGB\n';
         allScans.forEach(s => {
             const ms = getTimestamp(s);
-            const time = ms ? new Date(ms).toLocaleString('id-ID') : '';
-            csv += `"${time}","${getPH(s) || ''}","${getStatus(s)}","${getMeaning(s)}","${getRGBText(s)}","${getRawRGBText(s)}"\n`;
+            const t  = ms ? new Date(ms).toLocaleString('id-ID') : '';
+            csv += `"${t}","${getPH(s)||''}","${getStatus(s)}","${getMeaning(s)}","${getRGBText(s)}","${getRawRGBText(s)}"\n`;
         });
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'ph-scans.csv';
+        const a = Object.assign(document.createElement('a'), {
+            href:     URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
+            download: `ph-scans-${Date.now()}.csv`
+        });
         a.click();
     });
 
-    document.getElementById('deleteOldBtn').addEventListener('click', deleteOldScans);
+    document.getElementById('btnDeleteOld').addEventListener('click', () => {
+        if (allScans.length <= 50) { alert('Data kurang dari 50, tidak perlu dihapus'); return; }
+        const del = allScans.slice(0, allScans.length - 50);
+        if (!confirm(`Hapus ${del.length} data lama? Menyisakan 50 terbaru.`)) return;
+        const upd = {};
+        del.forEach(s => { if (s._id) upd['scans/' + s._id] = null; });
+        db.ref().update(upd).catch(e => alert('Gagal: ' + e.message));
+    });
 
-    document.getElementById('deleteAllBtn').addEventListener('click', () => {
-        if (!confirm('Yakin mau hapus SEMUA data scan?')) return;
-        if (!db) return;
+    document.getElementById('btnDeleteAll').addEventListener('click', () => {
+        if (!confirm('Hapus SEMUA data? Tindakan ini tidak bisa dibatalkan.')) return;
         db.ref('scans').remove()
-            .then(() => { allScans = []; renderTable(); updateStatistics(); alert('Semua data dihapus'); })
+            .then(() => { allScans = []; renderTable(); updateStats(); })
             .catch(e => alert('Gagal: ' + e.message));
     });
 });
