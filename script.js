@@ -11,11 +11,12 @@ const firebaseConfig = {
 };
 
 // ── State ──
-let db              = null;
-let allScans        = [];
-let phChart         = null;
-let realtimeRef     = null;
-let isRealtimeOn    = false;
+let db           = null;
+let allScans     = [];
+let phChart      = null;
+let rgbChart     = null;
+let realtimeRef  = null;
+let isRealtimeOn = false;
 
 // ── Helpers ──
 const getPH        = s => s.pH ?? s.ph ?? null;
@@ -26,14 +27,14 @@ const getTimestamp = s => {
     const t = Number(s.timestamp);
     return t < 1e12 ? t * 1000 : t;
 };
-const getRGB       = s => {
+const getRGB = s => {
     const rgb = s.normalizedRGB || s.rgb;
     if (!rgb) return { r: null, g: null, b: null };
     if (typeof rgb === 'object' && !Array.isArray(rgb))
         return { r: rgb.r ?? null, g: rgb.g ?? null, b: rgb.b ?? null };
     return { r: null, g: null, b: null };
 };
-const getRGBText   = s => {
+const getRGBText = s => {
     const { r, g, b } = getRGB(s);
     return `(${r ?? '--'}, ${g ?? '--'}, ${b ?? '--'})`;
 };
@@ -69,12 +70,11 @@ function set(id, text) {
     if (el) el.textContent = text;
 }
 
-// ── Connection status ──
 function setOnline(online) {
     const dot  = document.getElementById('connDot');
     const text = document.getElementById('connText');
     if (!dot || !text) return;
-    dot.className  = 'conn-dot ' + (online ? 'online' : 'offline');
+    dot.className    = 'conn-dot ' + (online ? 'online' : 'offline');
     text.textContent = online ? 'ONLINE' : 'OFFLINE';
 }
 
@@ -88,11 +88,10 @@ function updateReading(scan) {
     const color  = statusColor(status);
     const rgb    = getRGB(scan);
 
-    // pH ring
     const phNum = ph != null ? Number(ph) : null;
     set('phNumber', phNum != null ? phNum.toFixed(1) : '--');
 
-    const circumference = 314.16; // 2π × 50
+    const circumference = 314.16;
     const progress = phNum != null ? phNum / 14 : 0;
     const fill = document.getElementById('phRingFill');
     if (fill) {
@@ -100,21 +99,17 @@ function updateReading(scan) {
         fill.style.stroke = color;
     }
 
-    // pH scale bar indicator
     const indicator = document.getElementById('phIndicator');
     if (indicator && phNum != null) {
         indicator.style.left = `${(phNum / 14) * 100}%`;
         indicator.style.background = color;
     }
 
-    // status pill
     const pill = document.getElementById('statusPill');
     if (pill) { pill.textContent = status || '--'; pill.className = 'status-pill ' + sc; }
 
     set('meaningText', getMeaning(scan) || '--');
 
-    // RGB bars + swatch
-    const r = rgb.r ?? 128, g = rgb.g ?? 128, b = rgb.b ?? 128;
     ['r','g','b'].forEach(ch => {
         const val = rgb[ch];
         set(`rgb${ch.toUpperCase()}`, val ?? '--');
@@ -122,17 +117,14 @@ function updateReading(scan) {
         if (bar) bar.style.width = (val != null ? (val / 255 * 100) : 0) + '%';
     });
 
-    // Update color swatch
     const swatch = document.getElementById('rgbSwatch');
     if (swatch && rgb.r != null) {
         swatch.style.background = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
     }
 
-    // meta
     set('metaTimestamp', formatDate(scan));
     set('metaRawRGB', getRawRGBText(scan));
 
-    // last update
     const now = new Date().toLocaleString('id-ID');
     set('lastUpdate', now);
     set('footerTime', now);
@@ -142,9 +134,7 @@ function updateReading(scan) {
 function updateStats() {
     set('statTotal', allScans.length);
     if (allScans.length === 0) {
-        set('statFresh', '0');
-        set('statCaution', '0');
-        set('statRotten', '0');
+        set('statFresh', '0'); set('statCaution', '0'); set('statRotten', '0');
         return;
     }
     set('statFresh',   allScans.filter(s => getStatus(s) === 'FRESH').length);
@@ -152,20 +142,51 @@ function updateStats() {
     set('statRotten',  allScans.filter(s => getStatus(s) === 'ROTTEN').length);
 }
 
-// ── Chart ──
-function buildChart() {
+// ── Shared chart options ──
+function sharedScaleOpts(yMin, yMax, stepSize) {
+    return {
+        x: {
+            grid:  { color: '#f0f2f5' },
+            ticks: { font: { family: 'IBM Plex Mono', size: 11 }, color: '#94a3b8', maxTicksLimit: 10 }
+        },
+        y: {
+            min: yMin, max: yMax,
+            grid:  { color: '#f0f2f5' },
+            ticks: {
+                font: { family: 'IBM Plex Mono', size: 11 },
+                color: '#94a3b8',
+                stepSize,
+                callback: v => `${v}`
+            }
+        }
+    };
+}
+
+function sharedTooltipOpts(recent, extraLines) {
+    return {
+        backgroundColor: '#ffffff',
+        borderColor: '#dde1e8',
+        borderWidth: 1,
+        titleFont: { family: 'IBM Plex Mono', size: 11 },
+        bodyFont:  { family: 'IBM Plex Mono', size: 11 },
+        titleColor: '#475569',
+        bodyColor:  '#0f172a',
+        padding: 12,
+        callbacks: {
+            title: items => formatDate(recent[items[0].dataIndex]),
+            label: item  => extraLines(item, recent[item.dataIndex])
+        }
+    };
+}
+
+// ── pH Chart ──
+function buildPhChart(recent, labels) {
     const canvas = document.getElementById('phChart');
     if (!canvas) return;
-
     if (phChart) { phChart.destroy(); phChart = null; }
-    if (allScans.length === 0) return;
+    if (recent.length === 0) return;
 
-    const recent = allScans.slice(-60);
-    const labels = recent.map(s => {
-        const ms = getTimestamp(s);
-        return ms ? new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
-    });
-    const phVals = recent.map(s => { const v = getPH(s); return v != null ? Number(v) : null; });
+    const phVals   = recent.map(s => { const v = getPH(s); return v != null ? Number(v) : null; });
     const ptColors = recent.map(s => statusColor(getStatus(s)));
 
     phChart = new Chart(canvas.getContext('2d'), {
@@ -175,20 +196,20 @@ function buildChart() {
             datasets: [{
                 label: 'pH',
                 data: phVals,
-                borderColor: 'rgba(29,78,216,0.5)',
+                borderColor: 'rgba(29,78,216,0.55)',
                 backgroundColor: ctx => {
-                    const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 240);
-                    g.addColorStop(0, 'rgba(29,78,216,0.08)');
+                    const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 260);
+                    g.addColorStop(0, 'rgba(29,78,216,0.10)');
                     g.addColorStop(1, 'rgba(29,78,216,0.00)');
                     return g;
                 },
                 pointBackgroundColor: ptColors,
                 pointBorderColor: '#ffffff',
-                pointBorderWidth: 1.5,
-                pointRadius: 4,
-                pointHoverRadius: 6,
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7,
                 tension: 0.35,
-                borderWidth: 1.5,
+                borderWidth: 2,
                 fill: true,
                 spanGaps: true
             }]
@@ -199,50 +220,89 @@ function buildChart() {
             animation: { duration: 600, easing: 'easeOutQuart' },
             plugins: {
                 legend: { display: false },
-                tooltip: {
-                    backgroundColor: '#ffffff',
-                    borderColor: '#dde1e8',
-                    borderWidth: 1,
-                    titleFont:   { family: 'IBM Plex Mono', size: 10 },
-                    bodyFont:    { family: 'IBM Plex Mono', size: 10 },
-                    titleColor:  '#475569',
-                    bodyColor:   '#0f172a',
-                    padding: 10,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                    callbacks: {
-                        title: items => {
-                            const s = recent[items[0].dataIndex];
-                            return formatDate(s);
-                        },
-                        label: item => {
-                            const s = recent[item.dataIndex];
-                            return [
-                                `pH    : ${item.parsed.y}`,
-                                `Status: ${getStatus(s)}`,
-                                `RGB   : ${getRGBText(s)}`
-                            ];
-                        }
-                    }
-                }
+                tooltip: sharedTooltipOpts(recent, (item, s) => [
+                    `pH    : ${item.parsed.y ?? '--'}`,
+                    `Status: ${getStatus(s)}`,
+                    `RGB   : ${getRGBText(s)}`
+                ])
             },
-            scales: {
-                x: {
-                    grid:  { color: '#f0f2f5', drawBorder: false },
-                    ticks: { font: { family: 'IBM Plex Mono', size: 9 }, color: '#94a3b8', maxTicksLimit: 10 }
-                },
-                y: {
-                    min: 0, max: 14,
-                    grid:  { color: '#f0f2f5', drawBorder: false },
-                    ticks: {
-                        font: { family: 'IBM Plex Mono', size: 9 }, color: '#94a3b8',
-                        stepSize: 2,
-                        callback: v => `${v}`
-                    },
-                    title: { display: false }
-                }
-            }
+            scales: sharedScaleOpts(0, 14, 2)
         }
     });
+}
+
+// ── RGB Chart ──
+function buildRGBChart(recent, labels) {
+    const canvas = document.getElementById('rgbChart');
+    if (!canvas) return;
+    if (rgbChart) { rgbChart.destroy(); rgbChart = null; }
+    if (recent.length === 0) return;
+
+    const rVals = recent.map(s => { const rgb = getRGB(s); return rgb.r ?? null; });
+    const gVals = recent.map(s => { const rgb = getRGB(s); return rgb.g ?? null; });
+    const bVals = recent.map(s => { const rgb = getRGB(s); return rgb.b ?? null; });
+
+    const makeDataset = (label, data, color, bgColor) => ({
+        label,
+        data,
+        borderColor: color,
+        backgroundColor: bgColor,
+        pointBackgroundColor: color,
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 1.5,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        tension: 0.35,
+        borderWidth: 2,
+        fill: false,
+        spanGaps: true
+    });
+
+    rgbChart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                makeDataset('Red',   rVals, '#dc2626', 'rgba(220,38,38,0.08)'),
+                makeDataset('Green', gVals, '#16a34a', 'rgba(22,163,74,0.08)'),
+                makeDataset('Blue',  bVals, '#1d4ed8', 'rgba(29,78,216,0.08)')
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 600, easing: 'easeOutQuart' },
+            plugins: {
+                legend: { display: false },
+                tooltip: sharedTooltipOpts(recent, (item, s) => {
+                    const rgb = getRGB(s);
+                    return [
+                        `R: ${rgb.r ?? '--'}`,
+                        `G: ${rgb.g ?? '--'}`,
+                        `B: ${rgb.b ?? '--'}`,
+                        `pH: ${getPH(s) ?? '--'}`
+                    ];
+                })
+            },
+            scales: sharedScaleOpts(0, 255, 50)
+        }
+    });
+}
+
+// ── Build all charts ──
+function buildCharts() {
+    if (allScans.length === 0) {
+        if (phChart)  { phChart.destroy();  phChart  = null; }
+        if (rgbChart) { rgbChart.destroy(); rgbChart = null; }
+        return;
+    }
+    const recent = allScans.slice(-60);
+    const labels = recent.map(s => {
+        const ms = getTimestamp(s);
+        return ms ? new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
+    });
+    buildPhChart(recent, labels);
+    buildRGBChart(recent, labels);
 }
 
 // ── Table ──
@@ -267,9 +327,7 @@ function renderTable() {
             <td><span class="badge ${sc}">${status || '-'}</span></td>
             <td>${getMeaning(scan) || '-'}</td>
             <td>${getRGBText(scan)}</td>
-            <td>
-                <button class="btn-del" onclick="deleteScan('${scan._id || ''}')">Del</button>
-            </td>`;
+            <td><button class="btn-del" onclick="deleteScan('${scan._id || ''}')">Del</button></td>`;
         tbody.appendChild(tr);
     });
 }
@@ -278,8 +336,8 @@ function renderTable() {
 function processSnapshot(snap) {
     allScans = [];
     snap.forEach(child => {
-        const v  = child.val();
-        v._id    = child.key;
+        const v = child.val();
+        v._id = child.key;
         allScans.push(v);
     });
     allScans.sort((a, b) => (getTimestamp(a) || 0) - (getTimestamp(b) || 0));
@@ -287,7 +345,7 @@ function processSnapshot(snap) {
     if (allScans.length > 0) updateReading(allScans[allScans.length - 1]);
     updateStats();
     renderTable();
-    buildChart();
+    buildCharts();
 }
 
 // ── Delete ──
@@ -308,8 +366,8 @@ function startRealtime() {
 function stopRealtime() {
     if (!db || !realtimeRef) return;
     realtimeRef.off('value');
-    realtimeRef   = null;
-    isRealtimeOn  = false;
+    realtimeRef  = null;
+    isRealtimeOn = false;
 }
 
 function initFirebase() {
@@ -342,8 +400,7 @@ window.addEventListener('load', () => {
     });
 
     document.getElementById('btnRefresh').addEventListener('click', () => {
-        if (isRealtimeOn) return;
-        if (!db) return;
+        if (isRealtimeOn || !db) return;
         db.ref('scans').once('value', processSnapshot);
     });
 
@@ -374,7 +431,7 @@ window.addEventListener('load', () => {
     document.getElementById('btnDeleteAll').addEventListener('click', () => {
         if (!confirm('Hapus SEMUA data? Tindakan ini tidak bisa dibatalkan.')) return;
         db.ref('scans').remove()
-            .then(() => { allScans = []; renderTable(); updateStats(); })
+            .then(() => { allScans = []; renderTable(); updateStats(); buildCharts(); })
             .catch(e => alert('Gagal: ' + e.message));
     });
 });

@@ -154,10 +154,10 @@
             </div>
         </div>
 
-        <!-- Chart -->
+        <!-- pH Chart -->
         <div class="card">
             <div class="card-header">
-                <span class="card-label">pH Trend — 60 Scan Terakhir</span>
+                <span class="card-label">pH vs Waktu — 60 Scan Terakhir</span>
                 <div class="chart-legend">
                     <span class="legend-dot fresh"></span><span class="legend-text">Fresh</span>
                     <span class="legend-dot caution"></span><span class="legend-text">Caution</span>
@@ -166,6 +166,21 @@
             </div>
             <div class="chart-wrap">
                 <canvas id="phChart"></canvas>
+            </div>
+        </div>
+
+        <!-- RGB Chart -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-label">RGB vs Waktu — 60 Scan Terakhir</span>
+                <div class="chart-legend">
+                    <span class="legend-dot" style="background:#dc2626"></span><span class="legend-text">Red</span>
+                    <span class="legend-dot" style="background:#16a34a"></span><span class="legend-text">Green</span>
+                    <span class="legend-dot" style="background:#1d4ed8"></span><span class="legend-text">Blue</span>
+                </div>
+            </div>
+            <div class="chart-wrap">
+                <canvas id="rgbChart"></canvas>
             </div>
         </div>
 
