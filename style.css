@@ -92,7 +92,7 @@ body::before {
 
 /* Tambahan Style untuk Gambar Logo */
 .header-logo {
-    height: 40px;
+    height: 60px;
     object-fit: contain;
 }
 
