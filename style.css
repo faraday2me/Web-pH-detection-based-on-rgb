@@ -90,22 +90,11 @@ body::before {
 
 .header-left { display: flex; align-items: center; }
 
-.logo-badge {
-    font-family: var(--mono);
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    color: var(--accent);
-    background: var(--accent-bg);
-    border: 1.5px solid var(--accent-light);
-    padding: 6px 14px;
-    border-radius: var(--radius);
-    display: flex;
-    align-items: center;
-    gap: 7px;
+/* Tambahan Style untuk Gambar Logo */
+.header-logo {
+    height: 40px;
+    object-fit: contain;
 }
-
-.logo-icon { font-size: 16px; }
 
 .header-divider {
     width: 1px;
@@ -121,15 +110,6 @@ body::before {
     color: var(--text-primary);
     letter-spacing: 0.02em;
     margin-right: 12px;
-}
-
-.header-subtitle {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--text-dim);
-    letter-spacing: 0.06em;
-    border-left: 1px solid var(--border);
-    padding-left: 12px;
 }
 
 .header-right { display: flex; align-items: center; gap: 24px; }
@@ -545,20 +525,17 @@ tbody tr:last-child td { border-bottom: none; }
 .badge.rotten  { color: var(--rotten);  background: var(--rotten-bg);  border-color: var(--rotten-border); }
 .badge.unknown { color: var(--neutral); background: transparent; border-color: var(--border); }
 
-.btn-del {
-    font-family: var(--mono);
-    font-size: 11px;
-    padding: 5px 10px;
-    border: 1px solid var(--border);
-    border-radius: 2px;
-    background: transparent;
-    color: var(--text-dim);
-    cursor: pointer;
-    transition: all var(--transition);
-}
-.btn-del:hover { border-color: var(--rotten-border); color: var(--rotten); background: var(--rotten-bg); }
-
 .empty-state { text-align: center; padding: 52px; color: var(--text-muted); font-family: var(--mono); font-size: 13px; }
+
+/* Tambahan Style untuk interaksi checkbox & baris yang dipilih */
+.selected-row td {
+    background-color: var(--accent-bg) !important;
+}
+.row-check {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
 
 /* FOOTER */
 .footer { border-top: 1px solid var(--border); background: var(--bg-card); position: relative; z-index: 1; }
@@ -568,7 +545,7 @@ tbody tr:last-child td { border-bottom: none; }
     margin: 0 auto;
     padding: 18px 36px;
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
 }
 
@@ -590,7 +567,6 @@ tbody tr:last-child td { border-bottom: none; }
 @media (max-width: 640px) {
     .main-wrap { padding: 12px; gap: 12px; }
     .header-inner { padding: 0 16px; }
-    .header-subtitle { display: none; }
     .left-col { grid-template-columns: 1fr; }
     .stats-row { grid-template-columns: 1fr 1fr; }
     .toolbar { padding: 8px 12px; }

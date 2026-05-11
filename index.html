@@ -8,23 +8,20 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- ═══════════════════════════ HEADER ═══════════════════════════ -->
 <header class="header">
     <div class="header-inner">
         <div class="header-left">
-            <div class="logo-badge">
-                <span class="logo-icon">⬡</span>
-                PH-DETECT
-            </div>
+            <img src="asset-preview.webp" alt="BRIN Logo" class="header-logo">
             <div class="header-divider"></div>
             <span class="header-title">pH Detection Dashboard</span>
-            <span class="header-subtitle">ESP32 + TCS3200 Color Sensor</span>
         </div>
         <div class="header-right">
             <div class="conn-status">
@@ -39,13 +36,10 @@
     </div>
 </header>
 
-<!-- ═══════════════════════════ BODY ═══════════════════════════ -->
 <div class="main-wrap">
 
-    <!-- ── LEFT COLUMN ── -->
     <aside class="left-col">
 
-        <!-- Current pH -->
         <div class="card">
             <div class="card-header">
                 <span class="card-label">Current Reading</span>
@@ -67,7 +61,6 @@
                 <div id="meaningText" class="meaning-text">--</div>
             </div>
 
-            <!-- pH Scale Bar -->
             <div class="ph-scale-bar">
                 <div class="ph-bar-track">
                     <div class="ph-bar-segment acid"></div>
@@ -84,7 +77,6 @@
             </div>
         </div>
 
-        <!-- RGB -->
         <div class="card">
             <div class="card-header">
                 <span class="card-label">Normalized RGB</span>
@@ -131,10 +123,8 @@
 
     </aside>
 
-    <!-- ── RIGHT COLUMN ── -->
     <main class="right-col">
 
-        <!-- Stats -->
         <div class="stats-row">
             <div class="stat-cell">
                 <span class="sc-label">Total Scans</span>
@@ -154,7 +144,6 @@
             </div>
         </div>
 
-        <!-- pH Chart -->
         <div class="card">
             <div class="card-header">
                 <span class="card-label">pH vs Waktu — 60 Scan Terakhir</span>
@@ -169,43 +158,26 @@
             </div>
         </div>
 
-        <!-- RGB Chart -->
-        <div class="card">
-            <div class="card-header">
-                <span class="card-label">RGB vs Waktu — 60 Scan Terakhir</span>
-                <div class="chart-legend">
-                    <span class="legend-dot" style="background:#dc2626"></span><span class="legend-text">Red</span>
-                    <span class="legend-dot" style="background:#16a34a"></span><span class="legend-text">Green</span>
-                    <span class="legend-dot" style="background:#1d4ed8"></span><span class="legend-text">Blue</span>
-                </div>
-            </div>
-            <div class="chart-wrap">
-                <canvas id="rgbChart"></canvas>
-            </div>
-        </div>
-
-        <!-- History Table -->
         <div class="card">
             <div class="card-header">
                 <span class="card-label">Scan History</span>
             </div>
             <div class="toolbar">
-                <button id="btnRefresh"   class="btn">↺ Refresh</button>
-                <button id="btnRealtime"  class="btn btn-active">● Realtime ON</button>
-                <button id="btnExport"    class="btn btn-export">↓ Export CSV</button>
-                <button id="btnDeleteOld" class="btn btn-danger">Hapus Lama</button>
-                <button id="btnDeleteAll" class="btn btn-danger">Hapus Semua</button>
+                <button id="btnRealtime" class="btn btn-active">● Realtime ON</button>
+                <button id="btnExport" class="btn btn-export">↓ Export CSV</button>
+                <button id="btnExportPDF" class="btn btn-export" style="background:#dc2626; color:white; border-color:#b91c1c;">↓ Export PDF</button>
+                <button id="btnDeleteSelected" class="btn btn-danger">Hapus Terpilih</button>
             </div>
             <div class="table-wrap">
                 <table>
                     <thead>
                         <tr>
+                            <th style="width: 40px; text-align: center;"><input type="checkbox" id="checkAll"></th>
                             <th>Waktu</th>
                             <th>pH</th>
                             <th>Status</th>
                             <th>Keterangan</th>
                             <th>RGB (R, G, B)</th>
-                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody">
@@ -218,10 +190,8 @@
     </main>
 </div>
 
-<!-- FOOTER -->
 <footer class="footer">
     <div class="footer-inner">
-        <span class="footer-text">pH Detection System — ESP32 + TCS3200 + Firebase Realtime Database</span>
         <span id="footerTime" class="footer-text">--</span>
     </div>
 </footer>

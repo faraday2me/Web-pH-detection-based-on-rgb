@@ -14,9 +14,9 @@ const firebaseConfig = {
 let db           = null;
 let allScans     = [];
 let phChart      = null;
-let rgbChart     = null;
 let realtimeRef  = null;
 let isRealtimeOn = false;
+let selectedScanId = null;
 
 // ── Helpers ──
 const getPH        = s => s.pH ?? s.ph ?? null;
@@ -78,15 +78,13 @@ function setOnline(online) {
     text.textContent = online ? 'ONLINE' : 'OFFLINE';
 }
 
-// ── Current reading ──
-function updateReading(scan) {
+// ── Display Updaters ──
+function updatePHDisplay(scan) {
     if (!scan) return;
-
     const ph     = getPH(scan);
     const status = getStatus(scan);
     const sc     = statusClass(status);
     const color  = statusColor(status);
-    const rgb    = getRGB(scan);
 
     const phNum = ph != null ? Number(ph) : null;
     set('phNumber', phNum != null ? phNum.toFixed(1) : '--');
@@ -110,6 +108,15 @@ function updateReading(scan) {
 
     set('meaningText', getMeaning(scan) || '--');
 
+    const now = new Date().toLocaleString('id-ID');
+    set('lastUpdate', now);
+    set('footerTime', now);
+}
+
+function updateRGBDisplay(scan) {
+    if (!scan) return;
+    const rgb = getRGB(scan);
+    
     ['r','g','b'].forEach(ch => {
         const val = rgb[ch];
         set(`rgb${ch.toUpperCase()}`, val ?? '--');
@@ -124,10 +131,15 @@ function updateReading(scan) {
 
     set('metaTimestamp', formatDate(scan));
     set('metaRawRGB', getRawRGBText(scan));
+}
 
-    const now = new Date().toLocaleString('id-ID');
-    set('lastUpdate', now);
-    set('footerTime', now);
+function updateReading(scan) {
+    if (!scan) return;
+    updatePHDisplay(scan);
+    // Hanya perbarui RGB ke live jika tidak ada baris yang sedang dipilih
+    if (!selectedScanId) {
+        updateRGBDisplay(scan);
+    }
 }
 
 // ── Stats ──
@@ -142,52 +154,29 @@ function updateStats() {
     set('statRotten',  allScans.filter(s => getStatus(s) === 'ROTTEN').length);
 }
 
-// ── Shared chart options ──
-function sharedScaleOpts(yMin, yMax, stepSize) {
-    return {
-        x: {
-            grid:  { color: '#f0f2f5' },
-            ticks: { font: { family: 'IBM Plex Mono', size: 11 }, color: '#94a3b8', maxTicksLimit: 10 }
-        },
-        y: {
-            min: yMin, max: yMax,
-            grid:  { color: '#f0f2f5' },
-            ticks: {
-                font: { family: 'IBM Plex Mono', size: 11 },
-                color: '#94a3b8',
-                stepSize,
-                callback: v => `${v}`
-            }
-        }
-    };
-}
-
-function sharedTooltipOpts(recent, extraLines) {
-    return {
-        backgroundColor: '#ffffff',
-        borderColor: '#dde1e8',
-        borderWidth: 1,
-        titleFont: { family: 'IBM Plex Mono', size: 11 },
-        bodyFont:  { family: 'IBM Plex Mono', size: 11 },
-        titleColor: '#475569',
-        bodyColor:  '#0f172a',
-        padding: 12,
-        callbacks: {
-            title: items => formatDate(recent[items[0].dataIndex]),
-            label: item  => extraLines(item, recent[item.dataIndex])
-        }
-    };
-}
-
 // ── pH Chart ──
-function buildPhChart(recent, labels) {
+function buildCharts() {
+    if (allScans.length === 0) {
+        if (phChart)  { phChart.destroy();  phChart  = null; }
+        return;
+    }
+    const recent = allScans.slice(-60);
+    const labels = recent.map(s => {
+        const ms = getTimestamp(s);
+        return ms ? new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
+    });
+
     const canvas = document.getElementById('phChart');
     if (!canvas) return;
     if (phChart) { phChart.destroy(); phChart = null; }
-    if (recent.length === 0) return;
 
     const phVals   = recent.map(s => { const v = getPH(s); return v != null ? Number(v) : null; });
     const ptColors = recent.map(s => statusColor(getStatus(s)));
+    
+    // Konfigurasi tebal titik ketika baris dipilih
+    const pointRadii = recent.map(s => s._id === selectedScanId ? 8 : 4);
+    const pointBorderWidths = recent.map(s => s._id === selectedScanId ? 3 : 2);
+    const pointHoverRadii = recent.map(s => s._id === selectedScanId ? 10 : 6);
 
     phChart = new Chart(canvas.getContext('2d'), {
         type: 'line',
@@ -205,9 +194,9 @@ function buildPhChart(recent, labels) {
                 },
                 pointBackgroundColor: ptColors,
                 pointBorderColor: '#ffffff',
-                pointBorderWidth: 2,
-                pointRadius: 5,
-                pointHoverRadius: 7,
+                pointBorderWidth: pointBorderWidths,
+                pointRadius: pointRadii,
+                pointHoverRadius: pointHoverRadii,
                 tension: 0.35,
                 borderWidth: 2,
                 fill: true,
@@ -220,90 +209,60 @@ function buildPhChart(recent, labels) {
             animation: { duration: 600, easing: 'easeOutQuart' },
             plugins: {
                 legend: { display: false },
-                tooltip: sharedTooltipOpts(recent, (item, s) => [
-                    `pH    : ${item.parsed.y ?? '--'}`,
-                    `Status: ${getStatus(s)}`,
-                    `RGB   : ${getRGBText(s)}`
-                ])
+                tooltip: {
+                    backgroundColor: '#ffffff',
+                    borderColor: '#dde1e8',
+                    borderWidth: 1,
+                    titleFont: { family: 'IBM Plex Mono', size: 11 },
+                    bodyFont:  { family: 'IBM Plex Mono', size: 11 },
+                    titleColor: '#475569',
+                    bodyColor:  '#0f172a',
+                    padding: 12,
+                    callbacks: {
+                        title: items => formatDate(recent[items[0].dataIndex]),
+                        label: item => {
+                            const s = recent[item.dataIndex];
+                            return [
+                                `pH    : ${item.parsed.y ?? '--'}`,
+                                `Status: ${getStatus(s)}`,
+                                `RGB   : ${getRGBText(s)}`
+                            ];
+                        }
+                    }
+                }
             },
-            scales: sharedScaleOpts(0, 14, 2)
+            scales: {
+                x: {
+                    grid:  { color: '#f0f2f5' },
+                    ticks: { font: { family: 'IBM Plex Mono', size: 11 }, color: '#94a3b8', maxTicksLimit: 10 }
+                },
+                y: {
+                    min: 0, max: 14,
+                    grid:  { color: '#f0f2f5' },
+                    ticks: {
+                        font: { family: 'IBM Plex Mono', size: 11 },
+                        color: '#94a3b8',
+                        stepSize: 2
+                    }
+                }
+            }
         }
     });
 }
 
-// ── RGB Chart ──
-function buildRGBChart(recent, labels) {
-    const canvas = document.getElementById('rgbChart');
-    if (!canvas) return;
-    if (rgbChart) { rgbChart.destroy(); rgbChart = null; }
-    if (recent.length === 0) return;
-
-    const rVals = recent.map(s => { const rgb = getRGB(s); return rgb.r ?? null; });
-    const gVals = recent.map(s => { const rgb = getRGB(s); return rgb.g ?? null; });
-    const bVals = recent.map(s => { const rgb = getRGB(s); return rgb.b ?? null; });
-
-    const makeDataset = (label, data, color, bgColor) => ({
-        label,
-        data,
-        borderColor: color,
-        backgroundColor: bgColor,
-        pointBackgroundColor: color,
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 1.5,
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        tension: 0.35,
-        borderWidth: 2,
-        fill: false,
-        spanGaps: true
-    });
-
-    rgbChart = new Chart(canvas.getContext('2d'), {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [
-                makeDataset('Red',   rVals, '#dc2626', 'rgba(220,38,38,0.08)'),
-                makeDataset('Green', gVals, '#16a34a', 'rgba(22,163,74,0.08)'),
-                makeDataset('Blue',  bVals, '#1d4ed8', 'rgba(29,78,216,0.08)')
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: { duration: 600, easing: 'easeOutQuart' },
-            plugins: {
-                legend: { display: false },
-                tooltip: sharedTooltipOpts(recent, (item, s) => {
-                    const rgb = getRGB(s);
-                    return [
-                        `R: ${rgb.r ?? '--'}`,
-                        `G: ${rgb.g ?? '--'}`,
-                        `B: ${rgb.b ?? '--'}`,
-                        `pH: ${getPH(s) ?? '--'}`
-                    ];
-                })
-            },
-            scales: sharedScaleOpts(0, 255, 50)
-        }
-    });
-}
-
-// ── Build all charts ──
-function buildCharts() {
-    if (allScans.length === 0) {
-        if (phChart)  { phChart.destroy();  phChart  = null; }
-        if (rgbChart) { rgbChart.destroy(); rgbChart = null; }
-        return;
+// ── Interactive Row Click ──
+window.selectScan = function(id) {
+    if (selectedScanId === id) {
+        selectedScanId = null; // Toggle off jika di klik lagi
+        if (allScans.length > 0) updateRGBDisplay(allScans[allScans.length - 1]);
+    } else {
+        selectedScanId = id;
+        const scan = allScans.find(s => s._id === id);
+        if (scan) updateRGBDisplay(scan);
     }
-    const recent = allScans.slice(-60);
-    const labels = recent.map(s => {
-        const ms = getTimestamp(s);
-        return ms ? new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
-    });
-    buildPhChart(recent, labels);
-    buildRGBChart(recent, labels);
-}
+    renderTable();
+    buildCharts(); // Render ulang chart agar titik menjadi tebal
+};
 
 // ── Table ──
 function renderTable() {
@@ -320,16 +279,32 @@ function renderTable() {
         const ph     = getPH(scan);
         const status = getStatus(scan);
         const sc     = statusClass(status);
+        
         const tr = document.createElement('tr');
+        if (scan._id === selectedScanId) tr.classList.add('selected-row');
+        tr.style.cursor = 'pointer';
+        
+        tr.onclick = (e) => {
+            // Hindari trigger klik baris ketika mengklik checkbox
+            if (e.target.tagName === 'INPUT') return;
+            selectScan(scan._id);
+        };
+
         tr.innerHTML = `
+            <td style="text-align:center;">
+                <input type="checkbox" class="row-check" value="${scan._id}">
+            </td>
             <td>${formatDate(scan)}</td>
             <td class="td-ph">${ph != null ? Number(ph).toFixed(2) : '-'}</td>
             <td><span class="badge ${sc}">${status || '-'}</span></td>
             <td>${getMeaning(scan) || '-'}</td>
-            <td>${getRGBText(scan)}</td>
-            <td><button class="btn-del" onclick="deleteScan('${scan._id || ''}')">Del</button></td>`;
+            <td>${getRGBText(scan)}</td>`;
+        
         tbody.appendChild(tr);
     });
+
+    const checkAll = document.getElementById('checkAll');
+    if (checkAll) checkAll.checked = false;
 }
 
 // ── Process snapshot ──
@@ -342,18 +317,20 @@ function processSnapshot(snap) {
     });
     allScans.sort((a, b) => (getTimestamp(a) || 0) - (getTimestamp(b) || 0));
 
-    if (allScans.length > 0) updateReading(allScans[allScans.length - 1]);
+    if (allScans.length > 0) {
+        const latest = allScans[allScans.length - 1];
+        updateReading(latest);
+        // Pastikan tampilan RGB tetap pada data yang dipilih jika ada
+        if (selectedScanId) {
+            const sel = allScans.find(s => s._id === selectedScanId);
+            if (sel) updateRGBDisplay(sel);
+        }
+    }
+    
     updateStats();
     renderTable();
     buildCharts();
 }
-
-// ── Delete ──
-window.deleteScan = function(id) {
-    if (!id || !db) return;
-    if (!confirm('Hapus data ini?')) return;
-    db.ref('scans/' + id).remove().catch(e => alert('Gagal: ' + e.message));
-};
 
 // ── Firebase ──
 function startRealtime() {
@@ -399,11 +376,23 @@ window.addEventListener('load', () => {
         }
     });
 
-    document.getElementById('btnRefresh').addEventListener('click', () => {
-        if (isRealtimeOn || !db) return;
-        db.ref('scans').once('value', processSnapshot);
+    // Check All Checkbox Logic
+    document.getElementById('checkAll').addEventListener('change', (e) => {
+        document.querySelectorAll('.row-check').forEach(cb => cb.checked = e.target.checked);
     });
 
+    // Hapus Terpilih
+    document.getElementById('btnDeleteSelected').addEventListener('click', () => {
+        const checked = document.querySelectorAll('.row-check:checked');
+        if (checked.length === 0) { alert('Pilih data yang ingin dihapus terlebih dahulu'); return; }
+        if (!confirm(`Hapus ${checked.length} data terpilih?`)) return;
+        
+        const upd = {};
+        checked.forEach(cb => { upd['scans/' + cb.value] = null; });
+        db.ref().update(upd).catch(e => alert('Gagal: ' + e.message));
+    });
+
+    // Export CSV
     document.getElementById('btnExport').addEventListener('click', () => {
         if (allScans.length === 0) { alert('Belum ada data'); return; }
         let csv = 'Timestamp,pH,Status,Meaning,NormalizedRGB,RawRGB\n';
@@ -419,19 +408,54 @@ window.addEventListener('load', () => {
         a.click();
     });
 
-    document.getElementById('btnDeleteOld').addEventListener('click', () => {
-        if (allScans.length <= 50) { alert('Data kurang dari 50, tidak perlu dihapus'); return; }
-        const del = allScans.slice(0, allScans.length - 50);
-        if (!confirm(`Hapus ${del.length} data lama? Menyisakan 50 terbaru.`)) return;
-        const upd = {};
-        del.forEach(s => { if (s._id) upd['scans/' + s._id] = null; });
-        db.ref().update(upd).catch(e => alert('Gagal: ' + e.message));
-    });
+    // Export PDF
+    document.getElementById('btnExportPDF').addEventListener('click', () => {
+        if (allScans.length === 0) { alert('Belum ada data untuk diekspor'); return; }
+        
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
 
-    document.getElementById('btnDeleteAll').addEventListener('click', () => {
-        if (!confirm('Hapus SEMUA data? Tindakan ini tidak bisa dibatalkan.')) return;
-        db.ref('scans').remove()
-            .then(() => { allScans = []; renderTable(); updateStats(); buildCharts(); })
-            .catch(e => alert('Gagal: ' + e.message));
+        // Judul Dokumen
+        doc.setFontSize(16);
+        doc.text("Laporan Deteksi pH", 14, 20);
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text("Diekspor pada: " + new Date().toLocaleString('id-ID'), 14, 26);
+
+        // Siapkan Data
+        const tableData = allScans.map((s, i) => [
+            i + 1,
+            formatDate(s),
+            getPH(s) != null ? Number(getPH(s)).toFixed(2) : '-',
+            getStatus(s),
+            getMeaning(s),
+            getRGBText(s)
+        ]);
+
+        // Buat Tabel
+        doc.autoTable({
+            startY: 32,
+            head: [['No', 'Waktu', 'pH', 'Status', 'Keterangan', 'RGB']],
+            body: tableData,
+            columnStyles: {
+                0: { cellPadding: { left: 12 } } // Geser text nomer ke kanan untuk space warna
+            },
+            didDrawCell: function(data) {
+                // Gambar bulatan warna dari RGB di kolom 'No'
+                if (data.section === 'body' && data.column.index === 0) {
+                    const rowData = allScans[data.row.index];
+                    const rgb = getRGB(rowData);
+                    if (rgb.r != null && rgb.g != null && rgb.b != null) {
+                        doc.setFillColor(rgb.r, rgb.g, rgb.b);
+                        doc.circle(data.cell.x + 6, data.cell.y + (data.cell.height / 2), 2.5, 'F');
+                    }
+                }
+            },
+            styles: { font: 'helvetica', fontSize: 9 },
+            headStyles: { fillColor: [29, 78, 216], textColor: 255 }
+        });
+
+        // Unduh PDF
+        doc.save(`Laporan-pH-${Date.now()}.pdf`);
     });
 });
