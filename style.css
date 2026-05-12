@@ -246,7 +246,7 @@ tbody td {
 }
 tbody tr { cursor: pointer; transition: background var(--transition); }
 tbody tr:hover td { background: #eef2ff; }
-tbody tr.row-selected td { background: #e8f0fe; border-left: 3px solid var(--accent); }
+tbody tr.row-selected td { background: #e8f0fe; }
 tbody tr.row-highlighted td { background: #fff9e6; }
 tbody tr:last-child td { border-bottom: none; }
 
