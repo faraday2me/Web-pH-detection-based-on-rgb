@@ -440,19 +440,24 @@ function exportPDF() {
     colWidths.forEach(w => { colX.push(cx); cx += w; });
 
     // ── HEADER BRIN ──
-    // Logo placeholder (teks karena jsPDF tidak support webp langsung)
-    doc.setFillColor(220, 38, 38);
-    doc.roundedRect(margin, 8, 12, 12, 2, 2, 'F');
-    doc.setTextColor(255,255,255);
-    doc.setFontSize(7); doc.setFont('helvetica','bold');
-    doc.text('BRIN', margin+6, 15.5, { align:'center' });
+    // Mengambil elemen logo dari header HTML
+    const logoImg = document.querySelector('.asset-preview');
+    
+    if (logoImg && logoImg.complete) {
+        // Jika logo ditemukan dan sudah ter-load, masukkan ke PDF
+        // Format: doc.addImage(element, format, x, y, width, height)
+        doc.addImage(logoImg, 'PNG', margin, 8, 12, 12);
+    } else {
+        // Fallback kotak merah jika gambar gagal diambil
+        doc.setFillColor(220, 38, 38);
+        doc.roundedRect(margin, 8, 12, 12, 2, 2, 'F');
+        doc.setTextColor(255,255,255);
+        doc.setFontSize(7); doc.setFont('helvetica','bold');
+        doc.text('BRIN', margin+6, 15.5, { align:'center' });
+    }
 
     doc.setTextColor(30,30,30);
-    doc.setFontSize(14); doc.setFont('helvetica','bold');
-    doc.text('pH Detection Report', margin+16, 14);
-    doc.setFontSize(8); doc.setFont('helvetica','normal');
-    doc.setTextColor(100,100,100);
-    doc.text('Badan Riset dan Inovasi Nasional', margin+16, 19);
+    // ... sisa kode ke bawah (doc.setFontSize(14); doc.text('pH Detection Report'... dsb) dibiarkan sama
 
     // Tanggal cetak
     doc.setFontSize(8); doc.setFont('helvetica','normal');
@@ -579,7 +584,7 @@ function exportPDF() {
         doc.setFontSize(7); doc.setFont('helvetica','normal');
         doc.setTextColor(160,160,160);
         doc.line(margin, 289, pageW-margin, 289);
-        doc.text('BRIN — pH Detection System (ESP32 + TCS3200)', margin, 293);
+        doc.text('BRIN — Pusat Riset Elektronika', margin, 293);
         doc.text(`Halaman ${p} / ${pageCount}`, pageW-margin, 293, { align:'right' });
     }
 
