@@ -342,7 +342,7 @@ function updateDeleteBtn() {
     const btn = document.getElementById('btnDeleteSel');
     if (!btn) return;
     const n = checkedIds.size;
-    btn.textContent = n > 0 ? `☒ Hapus Dipilih (${n})` : '☐ Hapus Dipilih';
+    btn.textContent = n > 0 ? `Hapus Dipilih (${n})` : 'Hapus Dipilih';
 }
 
 // ── Process snapshot ──
@@ -594,20 +594,6 @@ function exportPDF() {
 // ── Event bindings ──
 window.addEventListener('load', () => {
     initFirebase();
-
-    // Realtime toggle
-    const rtBtn = document.getElementById('btnRealtime');
-    rtBtn.addEventListener('click', () => {
-        if (isRealtimeOn) {
-            stopRealtime();
-            rtBtn.textContent = '○ Realtime OFF';
-            rtBtn.classList.remove('btn-active');
-        } else {
-            startRealtime();
-            rtBtn.textContent = '● Realtime ON';
-            rtBtn.classList.add('btn-active');
-        }
-    });
 
     // Export CSV
     document.getElementById('btnExportCSV').addEventListener('click', exportCSV);
