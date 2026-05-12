@@ -356,23 +356,15 @@ tbody tr:last-child td { border-bottom: none; }
 }
 
 @media (max-width: 640px) {
-.main-wrap {
-    width: 100%; /* Menghapus max-width 1500px */
-    margin: 0;
-    padding: 24px;
-    display: grid; 
-    grid-template-columns: 320px 1fr; 
-    gap: 22px;
-}
+    .main-wrap { padding: 10px; gap: 12px; }
+
     /* --- Merapikan Header --- */
-    .header-inner {
-    width: 100%; /* Menghapus max-width 1500px */
-    margin: 0;
-    padding: 0 24px; /* Memberi sedikit jarak di ujung kiri/kanan */
-    display: flex; 
-    align-items: center; 
-    justify-content: space-between;
-    height: 68px;
+    .header-inner { 
+        padding: 12px; 
+        flex-direction: column; 
+        align-items: flex-start; 
+        height: auto; 
+        gap: 12px; 
     }
     .header-right { 
         width: 100%; 
@@ -413,18 +405,13 @@ tbody tr:last-child td { border-bottom: none; }
     }
 
     /* --- Merapikan Footer --- */
-   .footer-inner { 
-    width: 100%; /* Menghapus max-width 1500px */
-    margin: 0;
-    padding: 15px 24px; 
-    display: flex; 
-    justify-content: center;
-    align-items: center;
-    position: relative;
-}
+    .footer-inner { 
+        flex-direction: column; 
+        gap: 8px; 
+        padding: 16px; 
+    }
     #footerTime {
-    position: absolute;
-    right: 24px; /* Menyesuaikan dengan padding footer-inner */
-    font-size: 11px;
-}
+        position: static; /* Mengembalikan jam ke susunan normal (tidak absolut di pojok) */
+        margin-top: 4px;
+    }
 }
