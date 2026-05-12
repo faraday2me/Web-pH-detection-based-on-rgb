@@ -1,13 +1,13 @@
 // ===== pH Detection Dashboard — script.js =====
 
 const firebaseConfig = {
-    apiKey:            "AIzaSyAHuCnBj49G60HptaJyHtinT_OSeDvfgmY",
-    authDomain:        "ph-detection-based-on-rgb.firebaseapp.com",
-    databaseURL:       "https://ph-detection-based-on-rgb-default-rtdb.firebaseio.com",
-    projectId:         "ph-detection-based-on-rgb",
-    storageBucket:     "ph-detection-based-on-rgb.firebasestorage.app",
-    messagingSenderId: "48403449960",
-    appId:             "1:48403449960:web:d86dee6a856457436613dd",
+    apiKey:            "AIzaSyC1trXqG9n2WXXTGYegF_wU__P3514BpmU",
+    authDomain:        "ph-detection-brin.firebaseapp.com",
+    databaseURL:       "https://ph-detection-brin-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId:         "ph-detection-brin",
+    storageBucket:     "ph-detection-brin.firebasestorage.app",
+    messagingSenderId: "869440364506",
+    appId:             "1:869440364506:web:0658c57c60671990baeae3",
 };
 
 // ── State ──
